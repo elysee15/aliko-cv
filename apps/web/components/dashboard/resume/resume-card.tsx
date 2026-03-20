@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import Link from "next/link";
 import { MoreHorizontalIcon, TrashIcon, FileTextIcon } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
@@ -53,40 +54,45 @@ export function ResumeCard({ id, title, status, updatedAt }: ResumeCardProps) {
   }
 
   return (
-    <Card
-      className={isPending ? "pointer-events-none opacity-50" : undefined}
-      size="sm"
-    >
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <FileTextIcon className="size-4 text-muted-foreground" />
-          <CardTitle>{title}</CardTitle>
-        </div>
-        <CardDescription>
-          Modifié {formatRelativeDate(updatedAt)}
-        </CardDescription>
-        <CardAction>
+    <Link href={`/dashboard/${id}`} className="block">
+      <Card
+        className={`transition-colors hover:bg-muted/50 ${isPending ? "pointer-events-none opacity-50" : ""}`}
+        size="sm"
+      >
+        <CardHeader>
           <div className="flex items-center gap-2">
-            <Badge variant={status === "published" ? "default" : "secondary"}>
-              {status === "published" ? "Publié" : "Brouillon"}
-            </Badge>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={<Button variant="ghost" size="icon-xs" />}
-              >
-                <MoreHorizontalIcon />
-                <span className="sr-only">Actions</span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-                  <TrashIcon />
-                  Supprimer
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <FileTextIcon className="size-4 text-muted-foreground" />
+            <CardTitle>{title}</CardTitle>
           </div>
-        </CardAction>
-      </CardHeader>
-    </Card>
+          <CardDescription>
+            Modifié {formatRelativeDate(updatedAt)}
+          </CardDescription>
+          <CardAction>
+            <div
+              className="flex items-center gap-2"
+              onClick={(e) => e.preventDefault()}
+            >
+              <Badge variant={status === "published" ? "default" : "secondary"}>
+                {status === "published" ? "Publié" : "Brouillon"}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={<Button variant="ghost" size="icon-xs" />}
+                >
+                  <MoreHorizontalIcon />
+                  <span className="sr-only">Actions</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+                    <TrashIcon />
+                    Supprimer
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardAction>
+        </CardHeader>
+      </Card>
+    </Link>
   );
 }

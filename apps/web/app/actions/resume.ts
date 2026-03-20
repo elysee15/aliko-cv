@@ -8,10 +8,29 @@ import {
   createResume,
   deleteResume,
   updateResume,
+  createSection,
+  updateSection,
+  deleteSection,
+  createEntry,
+  updateEntry,
+  deleteEntry,
 } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
-import { createResumeSchema, updateResumeSchema } from "@/lib/schemas/resume";
+import {
+  createResumeSchema,
+  updateResumeSchema,
+  createSectionSchema,
+  updateSectionSchema,
+  createEntrySchema,
+  updateEntrySchema,
+} from "@/lib/schemas/resume";
+import type {
+  CreateSectionInput,
+  UpdateSectionInput,
+  CreateEntryInput,
+  UpdateEntryInput,
+} from "@/lib/schemas/resume";
 
 function slugify(text: string): string {
   return text
@@ -27,6 +46,10 @@ async function requireUser() {
   if (!session?.user) throw new Error("Non autorisé");
   return session.user;
 }
+
+// ---------------------------------------------------------------------------
+// Resume
+// ---------------------------------------------------------------------------
 
 export async function createResumeAction(input: { title: string }) {
   const user = await requireUser();
@@ -58,6 +81,7 @@ export async function updateResumeAction(
   });
 
   revalidatePath("/dashboard");
+  revalidatePath(`/dashboard/${id}`);
   return resume;
 }
 
@@ -69,4 +93,71 @@ export async function deleteResumeAction(id: string) {
 
   revalidatePath("/dashboard");
   return resume;
+}
+
+// ---------------------------------------------------------------------------
+// Section
+// ---------------------------------------------------------------------------
+
+export async function createSectionAction(input: CreateSectionInput) {
+  await requireUser();
+  const parsed = createSectionSchema.parse(input);
+  const section = await createSection(db, parsed);
+  revalidatePath(`/dashboard/${parsed.resumeId}`);
+  return section;
+}
+
+export async function updateSectionAction(
+  id: string,
+  resumeId: string,
+  input: UpdateSectionInput,
+) {
+  await requireUser();
+  const parsed = updateSectionSchema.parse(input);
+  const section = await updateSection(db, { id, ...parsed });
+  revalidatePath(`/dashboard/${resumeId}`);
+  return section;
+}
+
+export async function deleteSectionAction(id: string, resumeId: string) {
+  await requireUser();
+  const section = await deleteSection(db, id);
+  if (!section) throw new Error("Section introuvable");
+  revalidatePath(`/dashboard/${resumeId}`);
+  return section;
+}
+
+// ---------------------------------------------------------------------------
+// Entry
+// ---------------------------------------------------------------------------
+
+export async function createEntryAction(
+  input: CreateEntryInput,
+  resumeId: string,
+) {
+  await requireUser();
+  const parsed = createEntrySchema.parse(input);
+  const entry = await createEntry(db, parsed);
+  revalidatePath(`/dashboard/${resumeId}`);
+  return entry;
+}
+
+export async function updateEntryAction(
+  id: string,
+  resumeId: string,
+  input: UpdateEntryInput,
+) {
+  await requireUser();
+  const parsed = updateEntrySchema.parse(input);
+  const entry = await updateEntry(db, { id, ...parsed });
+  revalidatePath(`/dashboard/${resumeId}`);
+  return entry;
+}
+
+export async function deleteEntryAction(id: string, resumeId: string) {
+  await requireUser();
+  const entry = await deleteEntry(db, id);
+  if (!entry) throw new Error("Entrée introuvable");
+  revalidatePath(`/dashboard/${resumeId}`);
+  return entry;
 }
