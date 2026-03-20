@@ -7,8 +7,23 @@ import {
   ChevronUpIcon,
   EyeIcon,
   EyeOffIcon,
+  GripVerticalIcon,
   TrashIcon,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -23,9 +38,10 @@ import { Badge } from "@workspace/ui/components/badge";
 import {
   deleteSectionAction,
   updateSectionAction,
+  reorderEntriesAction,
 } from "@/app/actions/resume";
 import { sectionTypeLabels, type SectionType } from "@/lib/schemas/resume";
-import { EntryEditor } from "./entry-editor";
+import { SortableEntryEditor } from "./sortable-entry-editor";
 import { AddEntryDialog } from "./add-entry-dialog";
 
 type Entry = {
@@ -52,11 +68,26 @@ type Props = {
     visible: boolean;
     entries: Entry[];
   };
+  dragHandleProps?: Record<string, unknown>;
 };
 
-export function SectionEditor({ resumeId, section }: Props) {
+export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [optimisticEntryOrder, setOptimisticEntryOrder] = useState<
+    string[] | null
+  >(null);
+
+  const entrySensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const entryIds =
+    optimisticEntryOrder ?? section.entries.map((e) => e.id);
+  const orderedEntries = entryIds
+    .map((id) => section.entries.find((e) => e.id === id))
+    .filter(Boolean) as Entry[];
 
   function handleToggleVisibility() {
     startTransition(async () => {
@@ -78,18 +109,52 @@ export function SectionEditor({ resumeId, section }: Props) {
     });
   }
 
+  function handleEntryDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = entryIds.indexOf(active.id as string);
+    const newIndex = entryIds.indexOf(over.id as string);
+    const newOrder = arrayMove(entryIds, oldIndex, newIndex);
+
+    setOptimisticEntryOrder(newOrder);
+
+    const items = newOrder.map((id, i) => ({ id, sortOrder: i }));
+
+    startTransition(async () => {
+      const result = await reorderEntriesAction(resumeId, items);
+      setOptimisticEntryOrder(null);
+      if (!result.success) toast.error(result.error);
+    });
+  }
+
   return (
     <Card
       className={isPending ? "pointer-events-none opacity-50" : undefined}
     >
-      <CardHeader className="cursor-pointer" onClick={() => setExpanded(!expanded)}>
-        <div className="flex items-center gap-2">
-          {expanded ? (
-            <ChevronUpIcon className="size-4 text-muted-foreground" />
-          ) : (
-            <ChevronDownIcon className="size-4 text-muted-foreground" />
+      <CardHeader>
+        <div className="flex items-center gap-1">
+          {dragHandleProps && (
+            <button
+              type="button"
+              className="cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+              {...dragHandleProps}
+            >
+              <GripVerticalIcon className="size-4" />
+            </button>
           )}
-          <CardTitle>{section.title}</CardTitle>
+          <button
+            type="button"
+            className="flex items-center gap-2"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? (
+              <ChevronUpIcon className="size-4 text-muted-foreground" />
+            ) : (
+              <ChevronDownIcon className="size-4 text-muted-foreground" />
+            )}
+            <CardTitle>{section.title}</CardTitle>
+          </button>
           <Badge variant="outline" className="text-xs">
             {sectionTypeLabels[section.type]}
           </Badge>
@@ -100,7 +165,7 @@ export function SectionEditor({ resumeId, section }: Props) {
           )}
         </div>
         <CardAction>
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon-xs"
@@ -124,19 +189,32 @@ export function SectionEditor({ resumeId, section }: Props) {
 
       {expanded && (
         <CardContent className="space-y-3">
-          {section.entries.length === 0 ? (
+          {orderedEntries.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Aucune entrée dans cette section.
             </p>
           ) : (
-            section.entries.map((entry) => (
-              <EntryEditor
-                key={entry.id}
-                resumeId={resumeId}
-                sectionType={section.type}
-                entry={entry}
-              />
-            ))
+            <DndContext
+              sensors={entrySensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleEntryDragEnd}
+            >
+              <SortableContext
+                items={entryIds}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-3">
+                  {orderedEntries.map((entry) => (
+                    <SortableEntryEditor
+                      key={entry.id}
+                      resumeId={resumeId}
+                      sectionType={section.type}
+                      entry={entry}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
 
           <AddEntryDialog

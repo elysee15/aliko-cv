@@ -15,6 +15,8 @@ import {
   updateEntry,
   deleteEntry,
   duplicateResume,
+  reorderSections,
+  reorderEntries,
 } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
@@ -131,6 +133,38 @@ export async function duplicateResumeAction(
     return { success: true, data: resume };
   } catch {
     return { success: false, error: "Impossible de dupliquer le CV." };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reorder
+// ---------------------------------------------------------------------------
+
+export async function reorderSectionsAction(
+  resumeId: string,
+  items: { id: string; sortOrder: number }[],
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    await reorderSections(db, items);
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: null };
+  } catch {
+    return { success: false, error: "Impossible de réordonner les sections." };
+  }
+}
+
+export async function reorderEntriesAction(
+  resumeId: string,
+  items: { id: string; sortOrder: number }[],
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    await reorderEntries(db, items);
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: null };
+  } catch {
+    return { success: false, error: "Impossible de réordonner les entrées." };
   }
 }
 

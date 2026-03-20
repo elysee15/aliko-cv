@@ -209,6 +209,34 @@ export async function deleteEntry(db: Database, id: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Batch reorder
+// ---------------------------------------------------------------------------
+
+export async function reorderSections(
+  db: Database,
+  items: { id: string; sortOrder: number }[],
+) {
+  for (const item of items) {
+    await db
+      .update(resumeSection)
+      .set({ sortOrder: item.sortOrder })
+      .where(eq(resumeSection.id, item.id));
+  }
+}
+
+export async function reorderEntries(
+  db: Database,
+  items: { id: string; sortOrder: number }[],
+) {
+  for (const item of items) {
+    await db
+      .update(resumeEntry)
+      .set({ sortOrder: item.sortOrder })
+      .where(eq(resumeEntry.id, item.id));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Duplicate
 // ---------------------------------------------------------------------------
 
