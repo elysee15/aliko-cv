@@ -15,12 +15,12 @@ export function SplitViewShell({ toolbar, editor, preview }: Props) {
   const [activeTab, setActiveTab] = useState<"editor" | "preview">("editor");
 
   return (
-    <div className="-m-4 flex h-[calc(100svh-3.5rem)] flex-col">
-      {/* Toolbar */}
-      {toolbar}
+    <div className="-m-4 flex h-[calc(100svh-3.5rem)] flex-col print:m-0 print:h-auto">
+      {/* Toolbar — hidden when printing */}
+      <div className="print:hidden">{toolbar}</div>
 
-      {/* Mobile tabs */}
-      <div className="flex border-b lg:hidden">
+      {/* Mobile tabs — hidden when printing */}
+      <div className="flex border-b lg:hidden print:hidden">
         <button
           type="button"
           onClick={() => setActiveTab("editor")}
@@ -29,6 +29,8 @@ export function SplitViewShell({ toolbar, editor, preview }: Props) {
               ? "border-b-2 border-primary text-primary"
               : "text-muted-foreground hover:text-foreground"
           }`}
+          role="tab"
+          aria-selected={activeTab === "editor"}
         >
           <PenLineIcon className="size-3.5" />
           Éditeur
@@ -41,6 +43,8 @@ export function SplitViewShell({ toolbar, editor, preview }: Props) {
               ? "border-b-2 border-primary text-primary"
               : "text-muted-foreground hover:text-foreground"
           }`}
+          role="tab"
+          aria-selected={activeTab === "preview"}
         >
           <EyeIcon className="size-3.5" />
           Aperçu
@@ -48,23 +52,23 @@ export function SplitViewShell({ toolbar, editor, preview }: Props) {
       </div>
 
       {/* Content */}
-      <div className="flex min-h-0 flex-1">
-        {/* Editor pane */}
+      <div className="flex min-h-0 flex-1 print:block">
+        {/* Editor pane — hidden when printing */}
         <div
-          className={`w-full overflow-y-auto lg:block lg:w-1/2 lg:border-r ${
+          className={`w-full overflow-y-auto lg:block lg:w-1/2 lg:border-r print:hidden ${
             activeTab === "editor" ? "block" : "hidden"
           }`}
         >
           {editor}
         </div>
 
-        {/* Preview pane */}
+        {/* Preview pane — always visible when printing, full-width */}
         <div
-          className={`w-full overflow-y-auto bg-muted/30 p-4 lg:block lg:w-1/2 ${
+          className={`w-full overflow-y-auto bg-muted/30 p-4 lg:block lg:w-1/2 print:block print:w-full print:overflow-visible print:bg-white print:p-0 ${
             activeTab === "preview" ? "block" : "hidden"
           }`}
         >
-          <div className="mx-auto max-w-[210mm]">{preview}</div>
+          <div className="mx-auto max-w-[210mm] print:max-w-none">{preview}</div>
         </div>
       </div>
     </div>

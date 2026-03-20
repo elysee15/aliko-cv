@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useCallback } from "react";
+import { useTransition } from "react";
 import { toast } from "sonner";
 import {
   ChevronDownIcon,
@@ -20,6 +21,8 @@ import {
   updateEntryAction,
 } from "@/app/actions/resume";
 import type { SectionType } from "@/lib/schemas/resume";
+import { useAutosave } from "@/hooks/use-autosave";
+import { AutosaveIndicator } from "@/components/autosave-indicator";
 
 type Entry = {
   id: string;
@@ -57,31 +60,59 @@ const showOrganization = new Set<SectionType>([
   "volunteering",
 ]);
 
+type EntryFormData = {
+  title: string;
+  subtitle: string;
+  organization: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+};
+
+function entryToForm(entry: Entry): EntryFormData {
+  return {
+    title: entry.title,
+    subtitle: entry.subtitle ?? "",
+    organization: entry.organization ?? "",
+    location: entry.location ?? "",
+    startDate: entry.startDate ?? "",
+    endDate: entry.endDate ?? "",
+    current: entry.current,
+    description: entry.description ?? "",
+  };
+}
+
 export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [form, setForm] = useState<EntryFormData>(() => entryToForm(entry));
 
-  function handleSave(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
-      const result = await updateEntryAction(entry.id, resumeId, {
-        title: fd.get("title") as string,
-        subtitle: (fd.get("subtitle") as string) || null,
-        organization: (fd.get("organization") as string) || null,
-        location: (fd.get("location") as string) || null,
-        startDate: (fd.get("startDate") as string) || null,
-        endDate: (fd.get("endDate") as string) || null,
-        current: fd.get("current") === "on",
-        description: (fd.get("description") as string) || null,
+  const handleSave = useCallback(
+    async (data: EntryFormData) => {
+      return updateEntryAction(entry.id, resumeId, {
+        title: data.title,
+        subtitle: data.subtitle || null,
+        organization: data.organization || null,
+        location: data.location || null,
+        startDate: data.startDate || null,
+        endDate: data.endDate || null,
+        current: data.current,
+        description: data.description || null,
       });
-      if (result.success) {
-        toast.success("Enregistré.");
-        setExpanded(false);
-      } else {
-        toast.error(result.error);
-      }
-    });
+    },
+    [entry.id, resumeId],
+  );
+
+  const { status } = useAutosave({
+    data: form,
+    onSave: handleSave,
+    enabled: expanded && form.title.trim().length > 0,
+  });
+
+  function update(patch: Partial<EntryFormData>) {
+    setForm((prev) => ({ ...prev, ...patch }));
   }
 
   function handleDelete() {
@@ -104,6 +135,7 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
           <button
             type="button"
             className="cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+            aria-label="Réordonner"
             {...dragHandleProps}
           >
             <GripVerticalIcon className="size-3.5" />
@@ -115,10 +147,10 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
           onClick={() => setExpanded(true)}
         >
           <ChevronDownIcon className="size-3.5 text-muted-foreground" />
-          <span className="font-medium">{entry.title}</span>
-          {entry.organization && (
+          <span className="font-medium">{form.title || entry.title}</span>
+          {(form.organization || entry.organization) && (
             <span className="text-muted-foreground">
-              — {entry.organization}
+              — {form.organization || entry.organization}
             </span>
           )}
         </button>
@@ -127,6 +159,7 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
           size="icon-xs"
           onClick={handleDelete}
           className="text-destructive hover:text-destructive"
+          aria-label="Supprimer l'entrée"
         >
           <TrashIcon />
         </Button>
@@ -135,8 +168,7 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
   }
 
   return (
-    <form
-      onSubmit={handleSave}
+    <div
       className={`space-y-3 rounded-lg border p-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
     >
       <div className="flex items-center justify-between">
@@ -148,26 +180,37 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
           <ChevronUpIcon className="size-3.5 text-muted-foreground" />
           Modifier l&apos;entrée
         </button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={handleDelete}
-          className="text-destructive hover:text-destructive"
-        >
-          <TrashIcon />
-        </Button>
+        <div className="flex items-center gap-2">
+          <AutosaveIndicator status={status} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleDelete}
+            className="text-destructive hover:text-destructive"
+            aria-label="Supprimer l'entrée"
+          >
+            <TrashIcon />
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
           <FieldLabel><Label>Titre</Label></FieldLabel>
-          <Input name="title" defaultValue={entry.title} required />
+          <Input
+            value={form.title}
+            onChange={(e) => update({ title: e.target.value })}
+            required
+          />
         </Field>
 
         <Field>
           <FieldLabel><Label>Sous-titre</Label></FieldLabel>
-          <Input name="subtitle" defaultValue={entry.subtitle ?? ""} />
+          <Input
+            value={form.subtitle}
+            onChange={(e) => update({ subtitle: e.target.value })}
+          />
         </Field>
       </div>
 
@@ -176,13 +219,16 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
           <Field>
             <FieldLabel><Label>Organisation</Label></FieldLabel>
             <Input
-              name="organization"
-              defaultValue={entry.organization ?? ""}
+              value={form.organization}
+              onChange={(e) => update({ organization: e.target.value })}
             />
           </Field>
           <Field>
             <FieldLabel><Label>Lieu</Label></FieldLabel>
-            <Input name="location" defaultValue={entry.location ?? ""} />
+            <Input
+              value={form.location}
+              onChange={(e) => update({ location: e.target.value })}
+            />
           </Field>
         </div>
       )}
@@ -193,17 +239,17 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
             <FieldLabel><Label>Date de début</Label></FieldLabel>
             <Input
               type="date"
-              name="startDate"
-              defaultValue={entry.startDate ?? ""}
+              value={form.startDate}
+              onChange={(e) => update({ startDate: e.target.value })}
             />
           </Field>
           <Field>
             <FieldLabel><Label>Date de fin</Label></FieldLabel>
             <Input
               type="date"
-              name="endDate"
-              defaultValue={entry.endDate ?? ""}
-              disabled={entry.current}
+              value={form.endDate}
+              onChange={(e) => update({ endDate: e.target.value })}
+              disabled={form.current}
             />
           </Field>
         </div>
@@ -213,8 +259,10 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            name="current"
-            defaultChecked={entry.current}
+            checked={form.current}
+            onChange={(e) =>
+              update({ current: e.target.checked, ...(e.target.checked ? { endDate: "" } : {}) })
+            }
           />
           En cours
         </label>
@@ -223,26 +271,21 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
       <Field>
         <FieldLabel><Label>Description</Label></FieldLabel>
         <Textarea
-          name="description"
-          defaultValue={entry.description ?? ""}
+          value={form.description}
+          onChange={(e) => update({ description: e.target.value })}
           placeholder="Décrivez cette expérience, ce projet…"
           rows={3}
         />
       </Field>
 
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={isPending}>
-          {isPending ? "Enregistrement…" : "Enregistrer"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setExpanded(false)}
-        >
-          Annuler
-        </Button>
-      </div>
-    </form>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setExpanded(false)}
+      >
+        Replier
+      </Button>
+    </div>
   );
 }

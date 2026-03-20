@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import {
   ChevronDownIcon,
@@ -26,11 +26,11 @@ import {
 } from "@dnd-kit/sortable";
 
 import { Button } from "@workspace/ui/components/button";
+import { Input } from "@workspace/ui/components/input";
 import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
   CardAction,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
@@ -41,6 +41,8 @@ import {
   reorderEntriesAction,
 } from "@/app/actions/resume";
 import { sectionTypeLabels, type SectionType } from "@/lib/schemas/resume";
+import { useAutosave } from "@/hooks/use-autosave";
+import { AutosaveIndicator } from "@/components/autosave-indicator";
 import { SortableEntryEditor } from "./sortable-entry-editor";
 import { AddEntryDialog } from "./add-entry-dialog";
 
@@ -77,11 +79,25 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
   const [optimisticEntryOrder, setOptimisticEntryOrder] = useState<
     string[] | null
   >(null);
+  const [sectionTitle, setSectionTitle] = useState(section.title);
 
   const entrySensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
   );
+
+  const handleTitleSave = useCallback(
+    async (data: { title: string }) => {
+      return updateSectionAction(section.id, resumeId, { title: data.title });
+    },
+    [section.id, resumeId],
+  );
+
+  const { status: titleStatus } = useAutosave({
+    data: { title: sectionTitle },
+    onSave: handleTitleSave,
+    enabled: sectionTitle.trim().length > 0,
+  });
 
   const entryIds =
     optimisticEntryOrder ?? section.entries.map((e) => e.id);
@@ -138,6 +154,7 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
             <button
               type="button"
               className="cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+              aria-label="Réordonner la section"
               {...dragHandleProps}
             >
               <GripVerticalIcon className="size-4" />
@@ -145,7 +162,7 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
           )}
           <button
             type="button"
-            className="flex items-center gap-2"
+            className="flex items-center gap-1"
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? (
@@ -153,16 +170,22 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
             ) : (
               <ChevronDownIcon className="size-4 text-muted-foreground" />
             )}
-            <CardTitle>{section.title}</CardTitle>
           </button>
-          <Badge variant="outline" className="text-xs">
+          <Input
+            value={sectionTitle}
+            onChange={(e) => setSectionTitle(e.target.value)}
+            className="h-7 border-transparent bg-transparent px-1 text-sm font-semibold shadow-none hover:border-input focus:border-input"
+            aria-label="Titre de la section"
+          />
+          <Badge variant="outline" className="shrink-0 text-xs">
             {sectionTypeLabels[section.type]}
           </Badge>
           {!section.visible && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="shrink-0 text-xs">
               Masqué
             </Badge>
           )}
+          <AutosaveIndicator status={titleStatus} />
         </div>
         <CardAction>
           <div className="flex items-center gap-1">
@@ -171,6 +194,7 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
               size="icon-xs"
               onClick={handleToggleVisibility}
               title={section.visible ? "Masquer" : "Afficher"}
+              aria-label={section.visible ? "Masquer la section" : "Afficher la section"}
             >
               {section.visible ? <EyeIcon /> : <EyeOffIcon />}
             </Button>
@@ -180,6 +204,7 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
               onClick={handleDelete}
               className="text-destructive hover:text-destructive"
               title="Supprimer la section"
+              aria-label="Supprimer la section"
             >
               <TrashIcon />
             </Button>
