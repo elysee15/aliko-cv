@@ -14,10 +14,10 @@ Keep each logical domain in its own file under `packages/db/src/`. Re-export eve
 
 ```typescript
 // packages/db/src/users.ts
-import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
-  id: text('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
@@ -69,13 +69,13 @@ Export the `db` package with clear subpath exports in `package.json`:
 
 ## 2. Data Modeling
 
-### Primary Keys, Nullability, and Defaults
+### Primary Keys — Always `uuid` with `defaultRandom()`
 
-Always define primary keys, explicitly mark `notNull()`, and use `default()` / `defaultNow()` for consistent data.
+Every table must use `uuid('id').primaryKey().defaultRandom()` for its primary key. This maps to PostgreSQL's native `uuid` type with `gen_random_uuid()` as the default. **Never use `text` for primary keys.**
 
 ```typescript
 export const tasks = pgTable('tasks', {
-  id: text('id').primaryKey(),
+  id: uuid('id').primaryKey().defaultRandom(),
   title: text('title').notNull(),
   description: text('description'),                         // nullable on purpose
   isComplete: boolean('is_complete').default(false).notNull(),
@@ -86,16 +86,16 @@ export const tasks = pgTable('tasks', {
 
 ### Foreign Keys and Referential Actions
 
-Always specify `onDelete` (and `onUpdate` when appropriate). Use `cascade` for children that should be deleted with their parent. Use `set null` for soft-detach references.
+Always specify `onDelete` (and `onUpdate` when appropriate). Use `cascade` for children that should be deleted with their parent. Use `set null` for soft-detach references. Foreign keys referencing a `uuid` primary key must also be `uuid`.
 
 ```typescript
 // Cascade — delete posts when user is deleted
-authorId: text('author_id')
+authorId: uuid('author_id')
   .notNull()
   .references(() => users.id, { onDelete: 'cascade' }),
 
 // Set null — keep transactions but unassign user
-assignedId: text('assigned_id')
+assignedId: uuid('assigned_id')
   .references(() => users.id, { onDelete: 'set null' }),
 ```
 
@@ -105,8 +105,8 @@ For complex or composite foreign keys, use the `foreignKey()` helper in the thir
 import { foreignKey } from 'drizzle-orm/pg-core';
 
 export const transactions = pgTable('transactions', {
-  id: text('id').primaryKey(),
-  teamId: text('team_id').notNull(),
+  id: uuid('id').primaryKey().defaultRandom(),
+  teamId: uuid('team_id').notNull(),
   categorySlug: text('category_slug'),
 }, (table) => [
   foreignKey({
@@ -123,8 +123,8 @@ Add indexes on foreign keys, frequently filtered columns, and compound query pat
 
 ```typescript
 export const transactions = pgTable('transactions', {
-  id: text('id').primaryKey(),
-  teamId: text('team_id').notNull(),
+  id: uuid('id').primaryKey().defaultRandom(),
+  teamId: uuid('team_id').notNull(),
   date: date().notNull(),
   name: text('name').notNull(),
   categorySlug: text('category_slug'),
@@ -176,12 +176,14 @@ export const numericCasted = customType<{
 
 ### Composite Primary Keys (Junction Tables)
 
+Junction tables use a composite primary key (no single `uuid` id). The foreign key columns must match the referenced `uuid` type.
+
 ```typescript
 import { primaryKey } from 'drizzle-orm/pg-core';
 
 export const usersToGroups = pgTable('users_to_groups', {
-  userId: text('user_id').notNull().references(() => users.id),
-  groupId: text('group_id').notNull().references(() => groups.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  groupId: uuid('group_id').notNull().references(() => groups.id),
 }, (t) => [
   primaryKey({ columns: [t.userId, t.groupId] }),
 ]);
@@ -334,7 +336,7 @@ const usersWithPosts = await db.query.users.findMany({
 
 ```typescript
 const [newUser] = await db.insert(users)
-  .values({ id: generateId(), name: 'Alice', email: 'alice@example.com' })
+  .values({ name: 'Alice', email: 'alice@example.com' })
   .returning({ id: users.id, name: users.name });
 ```
 
@@ -342,11 +344,11 @@ const [newUser] = await db.insert(users)
 
 ```typescript
 await db.insert(users)
-  .values({ id: userId, name: 'Alice', email: 'alice@example.com' })
-  .onConflictDoUpdate({ target: users.id, set: { name: 'Alice Updated' } });
+  .values({ name: 'Alice', email: 'alice@example.com' })
+  .onConflictDoUpdate({ target: users.email, set: { name: 'Alice Updated' } });
 
 await db.insert(users)
-  .values({ id: userId, name: 'Alice', email: 'alice@example.com' })
+  .values({ name: 'Alice', email: 'alice@example.com' })
   .onConflictDoNothing({ target: users.email });
 ```
 
@@ -506,8 +508,10 @@ This project uses codebase-first migrations:
 Configure `pg.Pool` properly for your environment:
 
 ```typescript
+import { env } from "./env";
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.POSTGRES_URL ?? env.DATABASE_URL,
   max: isDevelopment ? 8 : 20,
   min: isDevelopment ? 0 : 2,
   idleTimeoutMillis: isDevelopment ? 5000 : 30000,
@@ -533,7 +537,8 @@ export const closeDb = async () => { await pool.end(); };
 | Using `db` instead of `tx` inside transactions | Always use the `tx` parameter |
 | N+1 queries from manual loops | Use relational queries or joins |
 | Inline query logic in route handlers | Extract to `packages/db/src/queries/` functions |
-| Hardcoding connection strings | Use environment variables |
+| Hardcoding connection strings | Import from validated `env.ts` |
+| Using `text` for primary keys | Use `uuid('id').primaryKey().defaultRandom()` |
 | Manually typing query results | Use `$inferSelect` / `$inferInsert` |
 | Not using `.returning()` | Use it when you need the affected row(s) |
 | Missing `.limit(1)` on single-row queries | Always add when you only need one result |

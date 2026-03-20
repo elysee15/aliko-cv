@@ -1,3 +1,5 @@
+import { env } from "./env";
+
 type ResetUser = { email: string; name?: string | null };
 
 /**
@@ -8,9 +10,8 @@ type ResetUser = { email: string; name?: string | null };
 export function queuePasswordResetEmail(user: ResetUser, url: string): void {
   void (async () => {
     try {
-      const key = process.env.RESEND_API_KEY;
-      const from =
-        process.env.RESEND_FROM_EMAIL ?? "Aliko CV <onboarding@resend.dev>";
+      const key = env.RESEND_API_KEY;
+      const from = env.RESEND_FROM_EMAIL ?? "Aliko CV <onboarding@resend.dev>";
 
       if (key) {
         const res = await fetch("https://api.resend.com/emails", {
@@ -26,7 +27,7 @@ export function queuePasswordResetEmail(user: ResetUser, url: string): void {
             html: `<p>Bonjour${user.name ? ` ${user.name}` : ""},</p>
 <p>Pour choisir un nouveau mot de passe, ouvrez ce lien (durée limitée)&nbsp;:</p>
 <p><a href="${url}">${url}</a></p>
-<p>Si vous n’avez pas demandé cette réinitialisation, vous pouvez ignorer cet email.</p>`,
+<p>Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email.</p>`,
           }),
         });
 

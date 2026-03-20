@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./client": "./src/client.ts",
-    "./schema": "./src/schema.ts"
+    "./env": "./src/env.ts",
+    "./schema": "./src/schema.ts",
+    "./queries": "./src/queries/index.ts"
   },
   "scripts": {
     "build": "tsc",
@@ -16,8 +18,10 @@
     "with-env": "dotenv -e ../../.env --"
   },
   "dependencies": {
+    "@t3-oss/env-core": "^0.13.10",
     "drizzle-orm": "^0.36.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/pg": "^8.11.0",
