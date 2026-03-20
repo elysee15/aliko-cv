@@ -131,6 +131,23 @@ export async function deleteResume(
   return row;
 }
 
+export async function getPublishedResumeBySlug(db: Database, slug: string) {
+  return db.query.resume.findFirst({
+    where: and(eq(resume.slug, slug), eq(resume.status, "published")),
+    with: {
+      user: true,
+      sections: {
+        orderBy: asc(resumeSection.sortOrder),
+        with: {
+          entries: {
+            orderBy: asc(resumeEntry.sortOrder),
+          },
+        },
+      },
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Section CRUD
 // ---------------------------------------------------------------------------

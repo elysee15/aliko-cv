@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, EyeIcon } from "lucide-react";
 import Link from "next/link";
 
 import { db } from "@aliko-cv/db/client";
@@ -11,6 +11,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
 import { ResumeHeaderEditor } from "@/components/dashboard/resume/editor/resume-header-editor";
 import { SectionList } from "@/components/dashboard/resume/editor/section-list";
+import { CopyLinkButton } from "@/components/resume/copy-link-button";
 
 type Params = Promise<{ id: string }>;
 
@@ -50,6 +51,17 @@ export default async function ResumeEditorPage({
               {resume.status === "published" ? "Publié" : "Brouillon"}
             </Badge>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {resume.status === "published" && (
+            <CopyLinkButton path={`/cv/${resume.slug}`} />
+          )}
+          <Link href={`/dashboard/${id}/preview`}>
+            <Button variant="outline" size="sm">
+              <EyeIcon data-icon="inline-start" />
+              Prévisualiser
+            </Button>
+          </Link>
         </div>
       </div>
 

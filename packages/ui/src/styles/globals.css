@@ -126,3 +126,22 @@
     @apply bg-background text-foreground;
     }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .resume-preview {
+    font-size: 12px !important;
+    color: black !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .resume-preview h1,
+  .resume-preview h2,
+  .resume-preview span,
+  .resume-preview p {
+    color: black !important;
+  }
+}
