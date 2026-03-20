@@ -1,6 +1,8 @@
 import type { Config } from "drizzle-kit";
 
-const url = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
+import { env } from "./src/env";
+
+const url = env.POSTGRES_URL ?? env.DATABASE_URL;
 if (!url) {
   throw new Error("Missing POSTGRES_URL or DATABASE_URL");
 }
