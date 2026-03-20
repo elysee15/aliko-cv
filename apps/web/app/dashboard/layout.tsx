@@ -22,7 +22,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-svh">
-      <header className="border-b px-4 py-3">
+      <header className="border-b px-4 py-3 print:hidden">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link
             href="/dashboard"
@@ -44,7 +44,7 @@ export default async function DashboardLayout({
           </div>
         </div>
       </header>
-      <main className="p-4">{children}</main>
+      <main className="p-4 print:p-0">{children}</main>
     </div>
   );
 }
