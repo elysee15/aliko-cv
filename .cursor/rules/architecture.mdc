@@ -1,0 +1,239 @@
+---
+description: Monorepo architecture conventions for this Turborepo + Next.js + Drizzle project. Defines package boundaries, layering, and code organization patterns. Inspired by midday.ai.
+globs: **/*.{ts,tsx,js,jsx}
+---
+# Monorepo Architecture
+
+This is a **Turborepo** monorepo with **Bun** as the package manager. The codebase follows a strict separation of concerns between apps and packages.
+
+## 1. Project Structure
+
+```
+aliko-cv/
+├── apps/
+│   └── web/              # Next.js dashboard app
+│       ├── app/          # App Router pages & layouts
+│       ├── components/   # App-specific UI components
+│       ├── hooks/        # App-specific React hooks
+│       └── lib/          # App-specific utilities (auth client, etc.)
+├── packages/
+│   ├── db/               # Drizzle ORM — schema, client, queries, migrations
+│   ├── auth/             # Better Auth — server config, email templates
+│   ├── ui/               # Shared UI components (shadcn/ui based)
+│   ├── eslint-config/    # Shared ESLint configs
+│   └── typescript-config/ # Shared tsconfig bases
+├── turbo.json
+└── package.json
+```
+
+### Rules
+
+- **apps/** contain deployable applications (Next.js, APIs, workers)
+- **packages/** contain shared libraries consumed by apps and each other
+- Every package has its own `package.json` with `exports` field defining its public API
+- Never import from a package's internal files — only through declared exports
+- Use `workspace:*` for inter-package dependencies
+
+## 2. Package Boundaries and Layering
+
+```
+┌─────────────────────────────────────────────────┐
+│                    apps/web                       │
+│  (Next.js pages, server actions, components)      │
+├─────────────────────────────────────────────────┤
+│                 packages/auth                     │
+│  (Authentication config, session management)      │
+├─────────────────────────────────────────────────┤
+│                  packages/db                      │
+│  (Schema, queries, client, migrations)            │
+├─────────────────────────────────────────────────┤
+│                  packages/ui                      │
+│  (Shared UI components, shadcn/ui)                │
+└─────────────────────────────────────────────────┘
+```
+
+### Dependency Direction
+
+Dependencies flow **downward only**. A lower-layer package must NEVER import from a higher-layer one.
+
+- `apps/web` can import from `packages/db`, `packages/auth`, `packages/ui`
+- `packages/auth` can import from `packages/db`
+- `packages/db` must NOT import from `packages/auth` or `apps/web`
+- `packages/ui` must NOT import from `packages/db` or `packages/auth`
+
+## 3. Database Package (`packages/db`)
+
+The `db` package is the single source of truth for all database interactions. It owns:
+
+### Schema (`packages/db/src/schema.ts`)
+- All table definitions, enums, relations
+- Domain schemas in separate files, barrel-exported through `schema.ts`
+
+### Client (`packages/db/src/client.ts`)
+- `pg.Pool` configuration and `drizzle()` instantiation
+- Exports `db` instance, `Database` type, `TransactionClient` type
+- Connection pooling config, graceful shutdown
+
+### Queries (`packages/db/src/queries/`)
+- **All database access goes through query functions** — not inline in route handlers
+- Every function takes `db` (or `DatabaseOrTransaction`) as its first parameter
+- One file per domain: `users.ts`, `teams.ts`, `invoices.ts`, etc.
+- Barrel-exported from `packages/db/src/queries/index.ts`
+- Define typed param objects for each function
+
+```typescript
+// packages/db/src/queries/users.ts
+import type { Database } from '../client';
+
+export const getUserById = async (db: Database, id: string) => { /* ... */ };
+export const updateUser = async (db: Database, data: UpdateUserParams) => { /* ... */ };
+export const deleteUser = async (db: Database, id: string) => { /* ... */ };
+```
+
+### Errors (`packages/db/src/errors.ts`)
+- Domain-specific error classes thrown by query functions
+- Caught and mapped to HTTP/tRPC errors in the app layer
+
+### Package Exports
+```json
+{
+  "exports": {
+    "./client": "./src/client.ts",
+    "./queries": "./src/queries/index.ts",
+    "./schema": "./src/schema.ts",
+    "./errors": "./src/errors.ts"
+  }
+}
+```
+
+## 4. Auth Package (`packages/auth`)
+
+- Better Auth server configuration
+- Email templates (password reset, verification, etc.)
+- Auth CLI scripts for development
+- Does NOT contain route handlers — those live in `apps/web/app/api/auth/`
+- **Client → Better Auth:** Use `apps/web/lib/auth-client.ts` (`createAuthClient` from `better-auth/client` or `better-auth/react`) per [Better Auth — Next.js](https://www.better-auth.com/docs/integrations/nextjs). Set `NEXT_PUBLIC_BETTER_AUTH_URL` to match `BETTER_AUTH_URL`. No `lib/auth-http` wrapper.
+
+## 5. UI Package (`packages/ui`)
+
+- Shared, reusable UI components (shadcn/ui based)
+- Must be **stateless with respect to business logic** — no database imports, no auth logic
+- Accept data through props; emit events through callbacks
+- App-specific components that depend on business context go in `apps/web/components/`
+
+## 6. App Architecture (`apps/web`)
+
+### App Router File Organization
+
+```
+apps/web/app/
+├── (public)/              # Public routes group (optional)
+│   ├── sign-in/page.tsx
+│   ├── sign-up/page.tsx
+│   └── forgot-password/page.tsx
+├── (authenticated)/       # Protected routes group (optional)
+│   └── dashboard/
+│       ├── layout.tsx     # Auth guard, sidebar, navigation
+│       └── page.tsx
+├── api/
+│   └── auth/[...all]/route.ts   # Auth API catch-all
+└── layout.tsx             # Root layout
+```
+
+### Server Components vs Client Components
+
+- **Default to Server Components** — they run on the server and can directly call query functions
+- Use `"use client"` only when you need browser APIs, event handlers, or React state
+- Never import `packages/db` in client components — fetch data in server components or via API routes
+
+### Data Flow
+
+```
+Server Component → import { getUserById } from '@aliko-cv/db/queries'
+                 → import { db } from '@aliko-cv/db/client'
+                 → const user = await getUserById(db, userId)
+                 → pass data as props to Client Components
+```
+
+For mutations, use one of:
+1. **Server Actions** — `"use server"` functions that call query functions
+2. **API Routes** — `app/api/` route handlers (for auth, webhooks, etc.)
+3. **tRPC** (when added) — type-safe API layer connecting frontend to query functions
+
+### Server Actions Pattern
+
+```typescript
+// apps/web/app/actions/user.ts
+'use server';
+
+import { db } from '@aliko-cv/db/client';
+import { updateUser } from '@aliko-cv/db/queries';
+
+export async function updateProfileAction(formData: FormData) {
+  const session = await getSession();
+  if (!session) throw new Error('Unauthorized');
+
+  return updateUser(db, {
+    id: session.user.id,
+    fullName: formData.get('name') as string,
+  });
+}
+```
+
+## 7. Adding New Packages
+
+When a concern grows beyond a single file, extract it into a package:
+
+1. Create `packages/<name>/` with `package.json`, `tsconfig.json`
+2. Define `exports` in `package.json` — only expose what consumers need
+3. Use `workspace:*` dependency in consumers
+4. Add to `turbo.json` tasks if it has build/lint/typecheck scripts
+5. Follow the naming convention: `@aliko-cv/<name>`
+
+Good candidates for extraction:
+- **`@aliko-cv/email`** — email templates and sending (Resend)
+- **`@aliko-cv/cache`** — caching layer (Redis/Upstash)
+- **`@aliko-cv/jobs`** — background job definitions
+- **`@aliko-cv/utils`** — shared utility functions
+- **`@aliko-cv/trpc`** — tRPC client/server shared setup
+
+## 8. Environment Variables
+
+- Define in `.env` at the monorepo root
+- List in `turbo.json` `passThroughEnv` for each task that needs them
+- Access via `process.env` — never hardcode secrets
+- Validate required env vars at module load time:
+
+```typescript
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error('Missing DATABASE_URL');
+```
+
+## 9. Code Conventions
+
+| Area | Convention |
+|---|---|
+| **TypeScript** | Strict mode, no `any` except escape hatches |
+| **Imports** | Use `@aliko-cv/<pkg>/<export>` aliases, not relative `../../` across packages |
+| **Exports** | Explicit `exports` field in `package.json`, no default exports from packages |
+| **Naming** | `camelCase` for functions/variables, `PascalCase` for types/components, `UPPER_SNAKE` for env vars |
+| **Files** | `kebab-case` for all filenames (e.g. `reset-password-email.ts`) |
+| **Formatting** | Prettier with Tailwind plugin |
+| **Linting** | ESLint with shared config from `packages/eslint-config` |
+
+## 10. Build and Development
+
+```bash
+bun dev          # Start all apps in parallel (turbo)
+bun run build    # Build all packages and apps
+bun run lint     # Lint all workspaces
+bun run typecheck # Type-check all workspaces
+bun run db:push  # Push schema changes to database
+```
+
+Turbo caches build outputs. Use `--filter=<app>` to target specific workspaces:
+
+```bash
+bun run dev --filter=web      # Only start the web app
+bun run build --filter=@aliko-cv/db  # Only build the db package
+```

@@ -1,0 +1,539 @@
+---
+description: Definitive Drizzle ORM best practices for this PostgreSQL + node-postgres project. Applies to all schema, query, and migration code. Inspired by midday.ai production patterns.
+globs: **/*.{ts,js}
+---
+# Drizzle ORM Best Practices
+
+This project uses **Drizzle ORM v1** with **PostgreSQL** (node-postgres driver), `snake_case` casing mode, and Drizzle Kit for migrations. All schema lives in `packages/db/src/`. Follow these guidelines for every database interaction.
+
+## 1. Code Organization and Structure
+
+### Schema File Structure
+
+Keep each logical domain in its own file under `packages/db/src/`. Re-export everything from a central `schema.ts` so Drizzle Kit and the client can discover all tables.
+
+```typescript
+// packages/db/src/users.ts
+import { pgTable, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+
+// packages/db/src/schema.ts — barrel export for Drizzle Kit
+export * from './users';
+export * from './posts';
+export * from './auth-schema';
+```
+
+### Naming Conventions
+
+- **TypeScript fields**: `camelCase` (e.g. `emailAddress`, `createdAt`)
+- **Database columns**: `snake_case` — the project's `drizzle.config.ts` and client both set `casing: "snake_case"`, so Drizzle maps automatically
+- **Tables**: singular noun, `snake_case` (e.g. `user`, `session`, `account`)
+- **Enums**: declare with `pgEnum`, name the export `*Enum` in TS
+
+```typescript
+import { pgEnum } from 'drizzle-orm/pg-core';
+
+export const userRoleEnum = pgEnum('user_role', ['admin', 'editor', 'viewer']);
+```
+
+### Barrel Exports for Queries
+
+Follow the midday pattern: group query functions by domain in `packages/db/src/queries/`, then barrel-export:
+
+```typescript
+// packages/db/src/queries/index.ts
+export * from './users';
+export * from './teams';
+export * from './invoices';
+```
+
+Export the `db` package with clear subpath exports in `package.json`:
+
+```json
+{
+  "exports": {
+    "./client": "./src/client.ts",
+    "./queries": "./src/queries/index.ts",
+    "./schema": "./src/schema.ts"
+  }
+}
+```
+
+## 2. Data Modeling
+
+### Primary Keys, Nullability, and Defaults
+
+Always define primary keys, explicitly mark `notNull()`, and use `default()` / `defaultNow()` for consistent data.
+
+```typescript
+export const tasks = pgTable('tasks', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),                         // nullable on purpose
+  isComplete: boolean('is_complete').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+```
+
+### Foreign Keys and Referential Actions
+
+Always specify `onDelete` (and `onUpdate` when appropriate). Use `cascade` for children that should be deleted with their parent. Use `set null` for soft-detach references.
+
+```typescript
+// Cascade — delete posts when user is deleted
+authorId: text('author_id')
+  .notNull()
+  .references(() => users.id, { onDelete: 'cascade' }),
+
+// Set null — keep transactions but unassign user
+assignedId: text('assigned_id')
+  .references(() => users.id, { onDelete: 'set null' }),
+```
+
+For complex or composite foreign keys, use the `foreignKey()` helper in the third argument:
+
+```typescript
+import { foreignKey } from 'drizzle-orm/pg-core';
+
+export const transactions = pgTable('transactions', {
+  id: text('id').primaryKey(),
+  teamId: text('team_id').notNull(),
+  categorySlug: text('category_slug'),
+}, (table) => [
+  foreignKey({
+    columns: [table.teamId, table.categorySlug],
+    foreignColumns: [categories.teamId, categories.slug],
+    name: 'transactions_category_fkey',
+  }),
+]);
+```
+
+### Indexes — Be Deliberate
+
+Add indexes on foreign keys, frequently filtered columns, and compound query patterns. Use the correct operator class for your data types:
+
+```typescript
+export const transactions = pgTable('transactions', {
+  id: text('id').primaryKey(),
+  teamId: text('team_id').notNull(),
+  date: date().notNull(),
+  name: text('name').notNull(),
+  categorySlug: text('category_slug'),
+}, (table) => [
+  index('transactions_team_id_idx').on(table.teamId),
+  index('transactions_date_idx').on(table.date),
+  // Compound index for the most common query pattern
+  index('transactions_team_date_idx').on(table.teamId, table.date),
+  // Partial index — only index rows that matter
+  index('transactions_active_idx')
+    .on(table.teamId, table.date, table.categorySlug)
+    .where(sql`status != 'excluded'`),
+]);
+```
+
+### Enums — Declare Once, Reuse Everywhere
+
+```typescript
+export const invoiceStatusEnum = pgEnum('invoice_status', [
+  'draft', 'overdue', 'paid', 'unpaid', 'canceled', 'scheduled', 'refunded',
+]);
+
+// Reference in table
+status: invoiceStatusEnum().default('draft').notNull(),
+```
+
+### Custom Types
+
+For types Drizzle doesn't natively support (e.g. `tsvector`, `numeric` that casts to `number`), use `customType`:
+
+```typescript
+import { customType } from 'drizzle-orm/pg-core';
+
+export const numericCasted = customType<{
+  data: number;
+  driverData: string;
+  config: { precision?: number; scale?: number };
+}>({
+  dataType: (config) => {
+    if (config?.precision && config?.scale) {
+      return `numeric(${config.precision}, ${config.scale})`;
+    }
+    return 'numeric';
+  },
+  fromDriver: (value: string) => Number.parseFloat(value),
+  toDriver: (value: number) => value.toString(),
+});
+```
+
+### Composite Primary Keys (Junction Tables)
+
+```typescript
+import { primaryKey } from 'drizzle-orm/pg-core';
+
+export const usersToGroups = pgTable('users_to_groups', {
+  userId: text('user_id').notNull().references(() => users.id),
+  groupId: text('group_id').notNull().references(() => groups.id),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.groupId] }),
+]);
+```
+
+## 3. Drizzle Relations (Soft Relations)
+
+Define `relations()` alongside table declarations. These power `db.query.*` and do NOT create DB-level constraints (that's `.references()`).
+
+```typescript
+import { relations } from 'drizzle-orm';
+
+export const userRelations = relations(user, ({ many }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  posts: many(posts),
+}));
+
+export const postRelations = relations(posts, ({ one }) => ({
+  author: one(user, {
+    fields: [posts.authorId],
+    references: [user.id],
+  }),
+}));
+```
+
+Use `relationName` to disambiguate when the same two tables have multiple relation paths:
+
+```typescript
+export const usersRelations = relations(users, ({ many }) => ({
+  authoredPosts: many(posts, { relationName: 'author' }),
+  reviewedPosts: many(posts, { relationName: 'reviewer' }),
+}));
+```
+
+## 4. Query Functions — The Repository Pattern
+
+**All database queries must be standalone exported functions that accept `db` (or `tx`) as the first argument.** This is the single most important architectural pattern. It enables:
+- Reuse across tRPC routes, server actions, background jobs, and scripts
+- Transparent use inside transactions (pass `tx` instead of `db`)
+- Easy testing and mocking
+
+```typescript
+// packages/db/src/queries/users.ts
+import { eq, and, sql } from 'drizzle-orm';
+import type { Database } from '../client';
+import { users, teams } from '../schema';
+
+export const getUserById = async (db: Database, id: string) => {
+  const [result] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      team: {
+        id: teams.id,
+        name: teams.name,
+      },
+    })
+    .from(users)
+    .leftJoin(teams, eq(users.teamId, teams.id))
+    .where(eq(users.id, id));
+
+  return result;
+};
+```
+
+### Type the Database and Transaction Client
+
+Export shared types so query functions can accept either `db` or `tx`:
+
+```typescript
+// packages/db/src/client.ts
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
+
+export type Database = typeof db;
+export type TransactionClient = PgTransaction<
+  NodePgQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+export type DatabaseOrTransaction = Database | TransactionClient;
+```
+
+Then accept `DatabaseOrTransaction` in query functions that run inside transactions:
+
+```typescript
+export const createTeam = async (db: DatabaseOrTransaction, params: CreateTeamParams) => {
+  // works with both db.transaction(tx => createTeam(tx, ...)) and createTeam(db, ...)
+};
+```
+
+### Partial Selects — Always
+
+Never use bare `select()` when you only need a few columns. Always select exactly what you need:
+
+```typescript
+// GOOD — explicit columns
+const [result] = await db
+  .select({ id: users.id, name: users.name, email: users.email })
+  .from(users)
+  .where(eq(users.id, id));
+
+// BAD — fetches everything, wastes bandwidth
+const [result] = await db.select().from(users).where(eq(users.id, id));
+```
+
+### Type Query Parameters Explicitly
+
+```typescript
+type UpdateUserParams = {
+  id: string;
+  fullName?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+};
+
+export const updateUser = async (db: Database, data: UpdateUserParams) => {
+  const { id, ...updateData } = data;
+  const [result] = await db
+    .update(users)
+    .set(updateData)
+    .where(eq(users.id, id))
+    .returning({ id: users.id, fullName: users.fullName, email: users.email });
+  return result;
+};
+```
+
+### Relational Queries API
+
+For nested data, prefer the relational query API — it generates a single SQL query.
+
+```typescript
+const usersWithPosts = await db.query.users.findMany({
+  with: {
+    posts: {
+      where: (posts, { gte }) => gte(posts.createdAt, cutoffDate),
+      limit: 5,
+      orderBy: (posts, { desc }) => [desc(posts.createdAt)],
+    },
+  },
+});
+```
+
+## 5. Mutations
+
+### Insert with `.returning()`
+
+```typescript
+const [newUser] = await db.insert(users)
+  .values({ id: generateId(), name: 'Alice', email: 'alice@example.com' })
+  .returning({ id: users.id, name: users.name });
+```
+
+### Upserts (On Conflict)
+
+```typescript
+await db.insert(users)
+  .values({ id: userId, name: 'Alice', email: 'alice@example.com' })
+  .onConflictDoUpdate({ target: users.id, set: { name: 'Alice Updated' } });
+
+await db.insert(users)
+  .values({ id: userId, name: 'Alice', email: 'alice@example.com' })
+  .onConflictDoNothing({ target: users.email });
+```
+
+### Update and Delete — ALWAYS use `.where()`
+
+The ESLint plugin `eslint-plugin-drizzle` enforces this.
+
+```typescript
+await db.update(users).set({ name: 'Updated' }).where(eq(users.id, targetId));
+await db.delete(users).where(eq(users.id, targetId));
+```
+
+Use `.returning()` on update/delete when you need the affected rows.
+
+## 6. Transactions
+
+Wrap multi-step mutations in `db.transaction()`. Use `tx` (not `db`) for all operations inside. Call `tx.rollback()` to abort.
+
+```typescript
+const teamId = await db.transaction(async (tx) => {
+  const [newTeam] = await tx.insert(teams)
+    .values({ name: params.name })
+    .returning({ id: teams.id });
+
+  if (!newTeam?.id) throw new Error('Failed to create team');
+
+  await tx.insert(usersOnTeam).values({
+    userId: params.userId,
+    teamId: newTeam.id,
+    role: 'owner',
+  });
+
+  if (params.switchTeam) {
+    await tx.update(users)
+      .set({ teamId: newTeam.id })
+      .where(eq(users.id, params.userId));
+  }
+
+  return newTeam.id;
+});
+```
+
+PostgreSQL-specific transaction config:
+
+```typescript
+await db.transaction(async (tx) => { /* ... */ }, {
+  isolationLevel: 'read committed',
+  accessMode: 'read write',
+});
+```
+
+## 7. Prepared Statements and Performance
+
+For hot-path queries, use `.prepare()` to avoid repeated SQL compilation:
+
+```typescript
+const getUser = db
+  .select()
+  .from(users)
+  .where(eq(users.id, sql.placeholder('id')))
+  .prepare('get_user');
+
+const user = await getUser.execute({ id: targetId });
+```
+
+### Performance Rules
+
+- **Partial selects always** — never `select()` without specifying columns
+- **Use `.prepare()` for frequently-executed queries**
+- **Use the relational query API** for nested data — 1 SQL query, no N+1
+- **Add indexes** on columns used in `.where()`, `.orderBy()`, and joins
+- **Add compound indexes** for multi-column filter patterns
+- **Paginate** — always use `.limit()` and `.offset()` for large sets
+- **Use `.limit(1)`** when you only need a single row
+
+## 8. Type Safety and Inference
+
+Use `$inferSelect` and `$inferInsert` instead of manually typing:
+
+```typescript
+type User = typeof users.$inferSelect;
+type NewUser = typeof users.$inferInsert;
+```
+
+## 9. Schema Validation with Zod
+
+As of `drizzle-orm` v1, Zod schema generation is built-in (the `drizzle-zod` package is deprecated). Use `createInsertSchema`, `createSelectSchema`, and `createUpdateSchema` from `drizzle-orm/zod`.
+
+```typescript
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from 'drizzle-orm/zod';
+
+const userInsertSchema = createInsertSchema(users, {
+  email: (schema) => schema.email(),
+  name: (schema) => schema.min(1).max(100),
+});
+```
+
+Use these schemas to validate API request bodies before passing data to Drizzle.
+
+## 10. Dynamic Query Building
+
+Use `.$dynamic()` for composable query helpers:
+
+```typescript
+import type { PgSelect } from 'drizzle-orm/pg-core';
+
+function withPagination<T extends PgSelect>(qb: T, page = 1, pageSize = 10) {
+  return qb.limit(pageSize).offset((page - 1) * pageSize);
+}
+
+const query = db.select().from(users).where(eq(users.active, true)).$dynamic();
+const results = await withPagination(query, 2, 20);
+```
+
+## 11. Error Handling
+
+Define domain-specific error classes in `packages/db/src/errors.ts`:
+
+```typescript
+export class NotFoundError extends Error {
+  code = 'NOT_FOUND' as const;
+  constructor(entity: string) {
+    super(`${entity} not found`);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ForbiddenError extends Error {
+  code = 'FORBIDDEN' as const;
+  constructor(message = 'Access denied') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+```
+
+Throw these from query functions; catch and map to HTTP/tRPC errors in the API layer.
+
+## 12. Migrations with Drizzle Kit
+
+This project uses codebase-first migrations:
+
+1. **Edit schema** in `packages/db/src/`
+2. **Generate**: `bunx drizzle-kit generate`
+3. **Apply**: `bunx drizzle-kit migrate` or `bunx drizzle-kit push` (dev only)
+4. **Pull** (if DB changed externally): `bunx drizzle-kit pull`
+
+### Rules
+
+- NEVER manually edit generated migration SQL files
+- ALWAYS review generated migrations before applying
+- Use `drizzle-kit push` only in development; use `generate` + `migrate` for production
+- Commit migration files to version control
+
+## 13. Connection Pooling
+
+Configure `pg.Pool` properly for your environment:
+
+```typescript
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: isDevelopment ? 8 : 20,
+  min: isDevelopment ? 0 : 2,
+  idleTimeoutMillis: isDevelopment ? 5000 : 30000,
+  connectionTimeoutMillis: 5000,
+  keepAlive: true,
+});
+```
+
+Export a `closeDb` function for graceful shutdown:
+
+```typescript
+export const closeDb = async () => { await pool.end(); };
+```
+
+## 14. Common Pitfalls
+
+| Pitfall | Fix |
+|---|---|
+| `.delete()` / `.update()` without `.where()` | Always chain `.where()`. ESLint enforces this. |
+| `select()` fetching all columns | Use partial select: `select({ id: users.id })` |
+| Missing `onDelete` on foreign keys | Always specify referential actions |
+| Forgetting `.notNull()` on required fields | Nullable should be intentional |
+| Using `db` instead of `tx` inside transactions | Always use the `tx` parameter |
+| N+1 queries from manual loops | Use relational queries or joins |
+| Inline query logic in route handlers | Extract to `packages/db/src/queries/` functions |
+| Hardcoding connection strings | Use environment variables |
+| Manually typing query results | Use `$inferSelect` / `$inferInsert` |
+| Not using `.returning()` | Use it when you need the affected row(s) |
+| Missing `.limit(1)` on single-row queries | Always add when you only need one result |

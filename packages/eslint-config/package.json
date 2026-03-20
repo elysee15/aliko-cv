@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/eslint-config",
+  "name": "@aliko-cv/eslint-config",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -22,5 +22,8 @@
     "globals": "^17.2.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0"
+  },
+  "dependencies": {
+    "eslint-plugin-drizzle": "^0.2.3"
   }
 }

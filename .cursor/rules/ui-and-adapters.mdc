@@ -1,0 +1,213 @@
+---
+description: Enforce shadcn/ui for all UI components and require adapter modules for external libraries (date-fns, HTTP clients, etc.) so implementations can be swapped without touching consumer code.
+globs: **/*.{tsx,jsx,ts}
+---
+# UI Components & Library Adapters
+
+## 1. Always Use shadcn/ui for UI
+
+This project uses [shadcn/ui](https://ui.shadcn.com) (`base-nova` style, `lucide` icons, Tailwind CSS v4). All UI components must come from shadcn/ui or be built on top of it.
+
+### Rules
+
+- **Use shadcn/ui components first.** Before building a custom component, check if shadcn/ui has one: Button, Input, Select, Dialog, Sheet, Table, Card, Form, etc.
+- **Install via CLI**: `bunx shadcn@latest add <component>` — installs to `packages/ui/src/components/`
+- **Import from `@workspace/ui`**: Never install shadcn components directly in `apps/web`. Always install in `packages/ui/` and import via the alias.
+
+```tsx
+// GOOD
+import { Button } from '@workspace/ui/components/button'
+import { Input } from '@workspace/ui/components/input'
+import { cn } from '@workspace/ui/lib/utils'
+
+// BAD — never import raw Radix/Base UI primitives directly in app code
+import { Button } from '@base-ui/react/button'
+import * as Dialog from '@radix-ui/react-dialog'
+```
+
+- **Use `cn()` for class merging**: Always use `cn()` from `@workspace/ui/lib/utils` — never raw `clsx` or string concatenation.
+- **Use `lucide-react` for icons**: The project standard. Import individual icons directly.
+
+```tsx
+// GOOD
+import { Check } from 'lucide-react'
+
+// BAD — don't mix icon libraries
+import { FaCheck } from 'react-icons/fa'
+```
+
+- **Extend shadcn components, don't replace them**: If you need a variant that doesn't exist, add it to the component's `cva` variants in `packages/ui/`. Don't create a parallel component.
+
+### Where Components Live
+
+| Location | What goes there |
+|---|---|
+| `packages/ui/src/components/` | Shared, reusable shadcn/ui components (no business logic) |
+| `apps/web/components/` | App-specific components that combine shared UI with business logic |
+
+## 2. Adapter Pattern for External Libraries
+
+**Every external utility library must be wrapped in an adapter module.** Never import external libs directly in app code. This enables swapping implementations (e.g. `date-fns` to `dayjs`, `axios` to `ky`) by changing a single file.
+
+### Adapter Location
+
+All adapters live in a shared package. As the project grows, create `packages/utils/` with subpath exports. For now, place adapters in `packages/ui/src/lib/` or `apps/web/lib/`.
+
+```
+packages/
+└── ui/
+    └── src/
+        └── lib/
+            ├── utils.ts          # cn() — already exists
+            ├── date.ts           # Date adapter
+            ├── currency.ts       # Currency/number formatting adapter
+            └── http.ts           # HTTP client adapter (if needed)
+```
+
+### Date Adapter Example
+
+```typescript
+// packages/ui/src/lib/date.ts (or packages/utils/src/date.ts)
+import { format, formatDistanceToNow, parseISO, isAfter, isBefore, addDays, subDays } from 'date-fns'
+
+export function formatDate(date: string | Date, pattern = 'PPP'): string {
+  const d = typeof date === 'string' ? parseISO(date) : date
+  return format(d, pattern)
+}
+
+export function formatRelativeTime(date: string | Date): string {
+  const d = typeof date === 'string' ? parseISO(date) : date
+  return formatDistanceToNow(d, { addSuffix: true })
+}
+
+export function formatShortDate(date: string | Date): string {
+  return formatDate(date, 'MMM d, yyyy')
+}
+
+export function formatDateTime(date: string | Date): string {
+  return formatDate(date, 'PPP p')
+}
+
+export function isDateAfter(date: Date, comparison: Date): boolean {
+  return isAfter(date, comparison)
+}
+
+export function isDateBefore(date: Date, comparison: Date): boolean {
+  return isBefore(date, comparison)
+}
+
+export { addDays, subDays, parseISO }
+```
+
+```tsx
+// GOOD — app code imports from adapter
+import { formatDate, formatRelativeTime } from '@workspace/ui/lib/date'
+
+function PostDate({ date }: { date: string }) {
+  return <time>{formatDate(date)}</time>
+}
+
+// BAD — never import date-fns directly in components
+import { format } from 'date-fns'
+```
+
+### Currency / Number Formatting Adapter
+
+```typescript
+// packages/ui/src/lib/currency.ts
+const defaultLocale = 'en-US'
+
+export function formatCurrency(amount: number, currency = 'USD', locale = defaultLocale): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+  }).format(amount)
+}
+
+export function formatNumber(value: number, locale = defaultLocale): string {
+  return new Intl.NumberFormat(locale).format(value)
+}
+
+export function formatPercentage(value: number, locale = defaultLocale): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'percent',
+    minimumFractionDigits: 1,
+  }).format(value)
+}
+```
+
+### HTTP client adapter (optional)
+
+Use a small `lib/http.ts` (or similar) **only** when you have many generic JSON calls to arbitrary backends and want one place to swap `fetch` for another client.
+
+**Do not** add an app-only wrapper whose sole job is proxying Better Auth — that duplicates the official integration for no gain.
+
+### Better Auth + Next.js
+
+Server config lives in `packages/auth`; the app exposes the handler at `apps/web/app/api/auth/[...all]/route.ts`.
+
+**Preferred in this repo:** a single **`apps/web/lib/auth-client.ts`** built with **`createAuthClient`** from **`better-auth/client`** (or `better-auth/react` if you need `useSession` / hooks). Use **`authClient.signIn.email`**, **`signUp.email`**, **`signOut`**, **`requestPasswordReset`**, **`resetPassword`**, etc. — not ad-hoc `fetch` to `/api/auth/...`.
+
+- Align **`baseURL`** with **`BETTER_AUTH_URL`** via **`NEXT_PUBLIC_BETTER_AUTH_URL`** (see `.env.example`).
+- Use **absolute** `callbackURL` / `redirectTo` (include origin), per [email & password best practices](https://www.better-auth.com/docs/authentication/email-password).
+- Docs: [Next.js](https://www.better-auth.com/docs/integrations/nextjs) · [Basic usage (client)](https://www.better-auth.com/docs/basic-usage) · [LLMs.txt](https://better-auth.com/llms.txt)
+
+Do **not** add a redundant `lib/auth-http` that only re-wraps `fetch`. Better Auth is the HTTP abstraction.
+
+### Slug / String Utility Adapter
+
+```typescript
+// packages/ui/src/lib/slug.ts
+import slugify from '@sindresorhus/slugify'
+
+export function toSlug(text: string): string {
+  return slugify(text)
+}
+
+export function toTitleCase(text: string): string {
+  return text.replace(/\b\w/g, (char) => char.toUpperCase())
+}
+```
+
+## 3. How to Apply This Pattern
+
+### When adding a new external library:
+
+1. **Install the package** in the correct workspace (`packages/ui` for shared, `apps/web` for app-specific)
+2. **Create an adapter** in `lib/` that wraps the library's API with your own function names
+3. **Export only what consumers need** — don't re-export the entire library
+4. **Import the adapter** in app code, never the raw library
+
+### When an adapter already exists:
+
+- Add new functions to the existing adapter
+- Keep the same naming conventions
+- Don't create a second adapter for the same domain
+
+### The rule of thumb:
+
+> If `import { X } from 'some-external-lib'` appears in a file under `apps/` or `packages/ui/src/components/`, it's wrong. It should be `import { X } from '@workspace/ui/lib/adapter'` or `import { X } from '@/lib/adapter'`.
+
+**Exception:** Use **`@/lib/auth-client`** (`createAuthClient` from **`better-auth/client`** or **`better-auth/react`**) for all Better Auth actions from the browser. Raw `fetch` to `/api/auth/*` is only for rare cases not exposed on the client API.
+
+### Exceptions
+
+These libraries are fine to import directly (they ARE the standard interface):
+- `react`, `react-dom`, `next/*` (framework)
+- `drizzle-orm/*` (already wrapped in `packages/db`)
+- `better-auth/*` (server: `packages/auth`; client: optional `better-auth/client` — see Better Auth + Next.js above)
+- `zod` (validation — universal, no alternative needed)
+- `tailwind-merge`, `clsx`, `class-variance-authority` (CSS utilities used only inside `packages/ui`)
+- `lucide-react` (icon library — standard for the project)
+- **`@/lib/auth-client`** — single `createAuthClient` instance for sign-in, sign-up, sign-out, password reset, etc.
+
+## 4. Checklist for Code Review
+
+- [ ] UI built with shadcn/ui components, not raw HTML or third-party UI kits
+- [ ] Icons from `lucide-react`, not mixed icon libraries
+- [ ] Class merging uses `cn()`, not string concatenation
+- [ ] External utility libs accessed through adapter modules (**except** Better Auth via `@/lib/auth-client`)
+- [ ] No `date-fns`, `dayjs`, `axios`, `lodash`, etc. imported directly in `apps/` or component files
+- [ ] Adapters export domain-specific function names, not raw library re-exports
+- [ ] New components installed in `packages/ui/`, not `apps/web/`
+- [ ] No redundant `lib/auth-http`-style module that only forwards `fetch` to Better Auth — use docs pattern instead

@@ -1,0 +1,28 @@
+---
+description: Nuqs search param hooks must live in hooks/queries.ts
+globs: hooks/**/*.ts, hooks/**/*.tsx
+alwaysApply: false
+---
+
+# Nuqs Query State Hooks
+
+All search-param state managed by **nuqs** must be defined in `hooks/queries.ts`.
+
+Each hook should follow the pattern established by `useSearchInputQuery`:
+
+```ts
+import type { UseQueryStateReturn } from 'nuqs';
+import { parseAsString, useQueryState } from 'nuqs';
+
+export function useSearchInputQuery(): UseQueryStateReturn<string, string> {
+  return useQueryState('search', parseAsString.withDefault(''));
+}
+```
+
+## Rules
+
+- **Single file**: define every nuqs hook in `hooks/queries.ts` — do not scatter them across feature folders or component files.
+- **Naming**: prefix with `use`, suffix with `Query` (e.g. `useFilterQuery`, `usePageQuery`).
+- **Typing**: always annotate the return type with `UseQueryStateReturn`.
+- **Defaults**: always provide a `.withDefault(...)` value.
+- **Exports**: export each hook as a named function so consumers import directly from `hooks/queries`.

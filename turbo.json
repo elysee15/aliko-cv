@@ -5,7 +5,18 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "outputs": [".next/**", "!.next/cache/**"],
+      "passThroughEnv": [
+        "NODE_ENV",
+        "VERCEL_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "NEXT_PUBLIC_BETTER_AUTH_URL",
+        "POSTGRES_URL",
+        "DATABASE_URL",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL"
+      ]
     },
     "lint": {
       "dependsOn": ["^lint"]
@@ -14,11 +25,34 @@
       "dependsOn": ["^format"]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^typecheck"],
+      "passThroughEnv": [
+        "NODE_ENV",
+        "POSTGRES_URL",
+        "DATABASE_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "NEXT_PUBLIC_BETTER_AUTH_URL"
+      ]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "NODE_ENV",
+        "VERCEL_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "NEXT_PUBLIC_BETTER_AUTH_URL",
+        "POSTGRES_URL",
+        "DATABASE_URL",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL"
+      ]
+    },
+    "push": {
+      "inputs": [".env*", "src/**/*.ts", "drizzle.config.ts"],
+      "passThroughEnv": ["POSTGRES_URL", "DATABASE_URL"]
     }
   }
 }

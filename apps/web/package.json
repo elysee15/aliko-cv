@@ -12,20 +12,26 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@workspace/ui": "workspace:*",
+    "@aliko-cv/auth": "workspace:*",
+    "@aliko-cv/db": "workspace:*",
+    "@aliko-cv/ui": "workspace:*",
+    "@hookform/resolvers": "^5.2.2",
+    "react-hook-form": "^7.71.2",
+    "better-auth": "^1.2.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.1.0",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
-    "@workspace/eslint-config": "workspace:^",
-    "@workspace/typescript-config": "workspace:*",
+    "@aliko-cv/eslint-config": "workspace:^",
+    "@aliko-cv/typescript-config": "workspace:*",
     "eslint": "^9.39.2",
     "typescript": "^5.9.3"
   }
