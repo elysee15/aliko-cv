@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Input } from "@workspace/ui/components/input";
@@ -11,11 +11,14 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  CardAction,
 } from "@workspace/ui/components/card";
 import { Field, FieldLabel, FieldDescription } from "@workspace/ui/components/field";
 import { Label } from "@workspace/ui/components/label";
 
 import { updateResumeAction } from "@/app/actions/resume";
+import { useAutosave } from "@/hooks/use-autosave";
+import { AutosaveIndicator } from "@/components/autosave-indicator";
 
 type Props = {
   id: string;
@@ -25,24 +28,29 @@ type Props = {
 };
 
 export function ResumeHeaderEditor({ id, title, summary, status }: Props) {
-  const formRef = useRef<HTMLFormElement>(null);
   const [isPending, startTransition] = useTransition();
+  const [currentTitle, setCurrentTitle] = useState(title);
+  const [currentSummary, setCurrentSummary] = useState(summary ?? "");
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
-      const result = await updateResumeAction(id, {
-        title: fd.get("title") as string,
-        summary: (fd.get("summary") as string) || null,
-      });
-      if (result.success) {
-        toast.success("Enregistré.");
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
+  const autosaveData = useMemo(
+    () => ({ title: currentTitle, summary: currentSummary || null }),
+    [currentTitle, currentSummary],
+  );
+
+  const handleAutoSave = useCallback(
+    async (data: { title: string; summary: string | null }) => {
+      if (!data.title.trim()) return { success: false };
+      return updateResumeAction(id, data);
+    },
+    [id],
+  );
+
+  const { status: saveStatus } = useAutosave({
+    data: autosaveData,
+    onSave: handleAutoSave,
+    delay: 800,
+    enabled: currentTitle.trim().length > 0,
+  });
 
   function handleToggleStatus() {
     const next = status === "draft" ? "published" : "draft";
@@ -60,18 +68,21 @@ export function ResumeHeaderEditor({ id, title, summary, status }: Props) {
     <Card>
       <CardHeader>
         <CardTitle>Informations générales</CardTitle>
+        <CardAction>
+          <AutosaveIndicator status={saveStatus} />
+        </CardAction>
       </CardHeader>
       <CardContent>
-        <form
-          ref={formRef}
-          onSubmit={handleSubmit}
-          className="space-y-4"
-        >
+        <div className="space-y-4">
           <Field>
             <FieldLabel>
               <Label>Titre du CV</Label>
             </FieldLabel>
-            <Input name="title" defaultValue={title} required />
+            <Input
+              value={currentTitle}
+              onChange={(e) => setCurrentTitle(e.target.value)}
+              required
+            />
           </Field>
 
           <Field>
@@ -79,8 +90,8 @@ export function ResumeHeaderEditor({ id, title, summary, status }: Props) {
               <Label>Résumé / Accroche</Label>
             </FieldLabel>
             <Textarea
-              name="summary"
-              defaultValue={summary ?? ""}
+              value={currentSummary}
+              onChange={(e) => setCurrentSummary(e.target.value)}
               placeholder="Quelques lignes qui résument votre profil…"
               rows={3}
             />
@@ -89,21 +100,16 @@ export function ResumeHeaderEditor({ id, title, summary, status }: Props) {
             </FieldDescription>
           </Field>
 
-          <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={isPending}>
-              {isPending ? "Enregistrement…" : "Enregistrer"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isPending}
-              onClick={handleToggleStatus}
-            >
-              {status === "draft" ? "Publier" : "Repasser en brouillon"}
-            </Button>
-          </div>
-        </form>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isPending}
+            onClick={handleToggleStatus}
+          >
+            {status === "draft" ? "Publier" : "Repasser en brouillon"}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

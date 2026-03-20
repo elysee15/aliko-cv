@@ -1,8 +1,9 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { SparklesIcon } from "lucide-react";
+import { SettingsIcon, SparklesIcon } from "lucide-react";
 
+import { Button } from "@workspace/ui/components/button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { auth } from "@/lib/auth";
 
@@ -34,6 +35,11 @@ export default async function DashboardLayout({
             <span className="text-sm text-muted-foreground">
               {session.user.name || session.user.email}
             </span>
+            <Link href="/dashboard/settings">
+              <Button variant="ghost" size="icon-sm" title="Paramètres">
+                <SettingsIcon />
+              </Button>
+            </Link>
             <SignOutButton className="h-auto px-0 text-sm font-normal text-muted-foreground underline-offset-4 hover:bg-transparent hover:text-muted-foreground hover:underline" />
           </div>
         </div>
