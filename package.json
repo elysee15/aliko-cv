@@ -2,16 +2,19 @@
   "name": "aliko-cv",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "bun@1.2.2",
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:push": "turbo run push --filter=@aliko-cv/db",
+    "auth:generate": "bunx --bun turbo run generate --filter=@aliko-cv/auth"
   },
   "devDependencies": {
-    "@workspace/eslint-config": "workspace:*",
-    "@workspace/typescript-config": "workspace:*",
+    "@aliko-cv/eslint-config": "workspace:*",
+    "@aliko-cv/typescript-config": "workspace:*",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "turbo": "^2.8.8",
@@ -23,5 +26,12 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint-plugin-drizzle": "^0.2.3",
+    "react-hook-form": "^7.71.2",
+    "zod": "^4.3.6"
+  }
 }

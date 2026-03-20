@@ -34,3 +34,16 @@ npm-debug.log*
 # Misc
 .DS_Store
 *.pem
+
+# Package store
+.pnpm-store/
+
+# BMAD artifacts
+_bmad/
+_bmad-output/
+
+# Agent / IDE config
+.agents/
+.claude/
+skills/
+skills-lock.json

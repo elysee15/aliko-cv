@@ -1,0 +1,251 @@
+---
+description: React and Next.js performance optimization rules from Vercel Engineering. 64 rules across 8 categories, prioritized by impact. Auto-applies when writing React components, Next.js pages, data fetching, or server actions.
+globs: **/*.{tsx,jsx}
+---
+# React & Next.js Performance Rules
+
+Prioritized performance optimization guide from [Vercel Engineering](https://github.com/vercel-labs/agent-skills/tree/main/skills/react-best-practices). Apply these rules when writing, reviewing, or refactoring React/Next.js code.
+
+## Priority 1: Eliminating Waterfalls (CRITICAL)
+
+### Use `Promise.all()` for independent async operations
+
+```typescript
+// BAD: sequential — 3 round trips
+const user = await fetchUser()
+const posts = await fetchPosts()
+const comments = await fetchComments()
+
+// GOOD: parallel — 1 round trip
+const [user, posts, comments] = await Promise.all([
+  fetchUser(), fetchPosts(), fetchComments()
+])
+```
+
+### Defer `await` until actually needed
+
+```typescript
+// BAD: blocks both branches
+async function handle(userId: string, skip: boolean) {
+  const data = await fetchData(userId)
+  if (skip) return { skipped: true }
+  return process(data)
+}
+
+// GOOD: only awaits when needed
+async function handle(userId: string, skip: boolean) {
+  if (skip) return { skipped: true }
+  const data = await fetchData(userId)
+  return process(data)
+}
+```
+
+### Start promises early, await late in API routes
+
+```typescript
+// GOOD
+export async function GET() {
+  const sessionPromise = auth()
+  const configPromise = fetchConfig()
+  const session = await sessionPromise
+  const [config, data] = await Promise.all([
+    configPromise, fetchData(session.user.id)
+  ])
+  return Response.json({ data, config })
+}
+```
+
+### Use Suspense boundaries to stream content
+
+```tsx
+// GOOD: layout renders immediately, data streams in
+function Page() {
+  return (
+    <div>
+      <Header />
+      <Suspense fallback={<Skeleton />}>
+        <DataDisplay />
+      </Suspense>
+      <Footer />
+    </div>
+  )
+}
+```
+
+## Priority 2: Bundle Size (CRITICAL)
+
+### Dynamic imports for heavy components
+
+```tsx
+import dynamic from 'next/dynamic'
+const HeavyComponent = dynamic(() => import('./heavy').then(m => m.Heavy), { ssr: false })
+```
+
+### Avoid barrel file imports — import directly
+
+```tsx
+// BAD
+import { Button } from '@/components'
+// GOOD
+import { Button } from '@/components/ui/button'
+```
+
+### Defer non-critical third-party libraries
+
+```tsx
+const Analytics = dynamic(
+  () => import('@vercel/analytics/react').then(m => m.Analytics),
+  { ssr: false }
+)
+```
+
+## Priority 3: Server-Side Performance (HIGH)
+
+### Authenticate Server Actions like API routes
+
+Server Actions are public endpoints. Always verify auth inside each action.
+
+```typescript
+'use server'
+export async function deleteUser(userId: string) {
+  const session = await getSession()
+  if (!session) throw new Error('Unauthorized')
+  if (session.user.id !== userId && session.user.role !== 'admin') {
+    throw new Error('Forbidden')
+  }
+  await db.delete(users).where(eq(users.id, userId))
+}
+```
+
+### Minimize data at RSC boundaries
+
+Only pass the fields client components actually use.
+
+```tsx
+// BAD: serializes all 50 fields
+<Profile user={user} />
+
+// GOOD: serializes only what's needed
+<Profile name={user.name} avatarUrl={user.avatarUrl} />
+```
+
+### Parallel data fetching via component composition
+
+```tsx
+// GOOD: Header and Sidebar fetch simultaneously
+function Page() {
+  return (
+    <div>
+      <Header />   {/* async, fetches independently */}
+      <Sidebar />  {/* async, fetches independently */}
+    </div>
+  )
+}
+```
+
+### Use `React.cache()` for per-request dedup
+
+```typescript
+import { cache } from 'react'
+export const getCurrentUser = cache(async () => {
+  const session = await auth()
+  if (!session?.user?.id) return null
+  return getUserById(db, session.user.id)
+})
+```
+
+### Use `after()` for non-blocking operations
+
+```typescript
+import { after } from 'next/server'
+export async function POST(request: Request) {
+  await updateDatabase(request)
+  after(async () => { await logAction(request) })
+  return Response.json({ status: 'success' })
+}
+```
+
+## Priority 4: Re-render Optimization (MEDIUM)
+
+### Derive state during render — don't store in useState + useEffect
+
+```tsx
+// BAD
+const [fullName, setFullName] = useState('')
+useEffect(() => setFullName(first + ' ' + last), [first, last])
+
+// GOOD
+const fullName = first + ' ' + last
+```
+
+### Don't define components inside components
+
+Causes remount on every render, destroying state and DOM.
+
+### Use functional `setState` for stable callbacks
+
+```tsx
+// GOOD: no stale closures, stable reference
+const addItem = useCallback((item: Item) => {
+  setItems(curr => [...curr, item])
+}, [])
+```
+
+### Use lazy state initialization for expensive values
+
+```tsx
+// GOOD: runs only once
+const [data, setData] = useState(() => expensiveComputation())
+```
+
+### Use `useDeferredValue` / `startTransition` for non-urgent updates
+
+### Don't wrap simple primitive expressions in `useMemo`
+
+### Narrow effect dependencies to primitives
+
+```tsx
+// BAD: re-runs on any user field change
+useEffect(() => { console.log(user.id) }, [user])
+// GOOD: re-runs only when id changes
+useEffect(() => { console.log(user.id) }, [user.id])
+```
+
+## Priority 5: Rendering Performance (MEDIUM)
+
+### Use `content-visibility: auto` for long lists
+
+```css
+.list-item { content-visibility: auto; contain-intrinsic-size: 0 80px; }
+```
+
+### Hoist static JSX outside components
+
+### Animate div wrapper around SVG, not SVG directly (hardware acceleration)
+
+### Use `suppressHydrationWarning` only for expected mismatches (dates, locale)
+
+### Use ternary `? :` not `&&` for conditional rendering (prevents rendering `0`)
+
+### Use `next/script` with `strategy` prop instead of raw script tags
+
+### Use React DOM resource hints (`preconnect`, `preload`, `prefetchDNS`)
+
+## Priority 6: JavaScript Performance (LOW-MEDIUM)
+
+### Build `Map`/`Set` for repeated lookups (O(1) vs O(n))
+
+### Use `toSorted()` not `sort()` (immutability in React)
+
+### Use `flatMap` to map + filter in one pass
+
+### Early return from functions
+
+### Cache property access in hot loops
+
+### Avoid layout thrashing — batch DOM writes, then read
+
+## Full Reference
+
+For detailed explanations with code examples for all 64 rules, see the complete guide:
+`.agents/skills/vercel-react-best-practices/AGENTS.md`
