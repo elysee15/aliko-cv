@@ -5,6 +5,7 @@ import { db } from "@aliko-cv/db/client";
 import { getPublishedResumeBySlug } from "@aliko-cv/db/queries";
 
 import { ResumePreview } from "@/components/resume/resume-preview";
+import type { TemplateType } from "@/lib/schemas/resume";
 
 type Params = Promise<{ slug: string }>;
 
@@ -39,6 +40,7 @@ export default async function PublicResumePage({
       <div className="mx-auto max-w-[210mm]">
         <div className="rounded-xl border bg-background shadow-sm print:border-none print:shadow-none">
           <ResumePreview
+            template={(resume.template ?? "classic") as TemplateType}
             resume={{
               title: resume.title,
               summary: resume.summary,

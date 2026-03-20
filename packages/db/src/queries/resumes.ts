@@ -21,6 +21,7 @@ export type UpdateResumeParams = {
   slug?: string;
   summary?: string | null;
   status?: "draft" | "published";
+  template?: "classic" | "modern" | "minimal";
 };
 
 export type CreateSectionParams = {

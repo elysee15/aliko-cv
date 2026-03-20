@@ -13,6 +13,21 @@ export const createResumeSchema = z.object({
 
 export type CreateResumeInput = z.infer<typeof createResumeSchema>;
 
+export const templateTypes = ["classic", "modern", "minimal"] as const;
+export type TemplateType = (typeof templateTypes)[number];
+
+export const templateLabels: Record<TemplateType, string> = {
+  classic: "Classique",
+  modern: "Moderne",
+  minimal: "Minimaliste",
+};
+
+export const templateDescriptions: Record<TemplateType, string> = {
+  classic: "En-tête centré, sections bordées — professionnel et lisible.",
+  modern: "Mise en page avec accent coloré et typographie moderne.",
+  minimal: "Épuré et aéré, laisse le contenu respirer.",
+};
+
 export const updateResumeSchema = z.object({
   title: z
     .string()
@@ -21,6 +36,7 @@ export const updateResumeSchema = z.object({
     .optional(),
   summary: z.string().max(2000).nullable().optional(),
   status: z.enum(["draft", "published"]).optional(),
+  template: z.enum(templateTypes).optional(),
 });
 
 export type UpdateResumeInput = z.infer<typeof updateResumeSchema>;

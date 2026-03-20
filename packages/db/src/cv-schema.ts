@@ -29,6 +29,12 @@ export const sectionTypeEnum = pgEnum("section_type", [
   "custom",
 ]);
 
+export const resumeTemplateEnum = pgEnum("resume_template", [
+  "classic",
+  "modern",
+  "minimal",
+]);
+
 export const skillLevelEnum = pgEnum("skill_level", [
   "beginner",
   "intermediate",
@@ -52,6 +58,7 @@ export const resume = pgTable(
     title: text("title").notNull(),
     slug: text("slug").notNull(),
     summary: text("summary"),
+    template: resumeTemplateEnum("template").default("classic").notNull(),
     status: resumeStatusEnum("status").default("draft").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

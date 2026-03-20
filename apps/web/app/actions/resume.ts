@@ -85,6 +85,7 @@ export async function updateResumeAction(
     title?: string;
     summary?: string | null;
     status?: "draft" | "published";
+    template?: "classic" | "modern" | "minimal";
   },
 ): Promise<ActionResult> {
   try {
