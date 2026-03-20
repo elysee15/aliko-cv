@@ -14,6 +14,7 @@
     "build": "tsc",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "push": "bun run with-env drizzle-kit push",
+    "seed": "bun run with-env bun src/seed.ts",
     "studio": "bun run with-env drizzle-kit studio",
     "with-env": "dotenv -e ../../.env --"
   },
