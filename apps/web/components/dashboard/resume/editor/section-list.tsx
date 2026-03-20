@@ -3,6 +3,20 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -25,13 +39,16 @@ import {
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Label } from "@workspace/ui/components/label";
 
-import { createSectionAction } from "@/app/actions/resume";
+import {
+  createSectionAction,
+  reorderSectionsAction,
+} from "@/app/actions/resume";
 import {
   sectionTypes,
   sectionTypeLabels,
   type SectionType,
 } from "@/lib/schemas/resume";
-import { SectionEditor } from "./section-editor";
+import { SortableSectionEditor } from "./sortable-section-editor";
 
 type Entry = {
   id: string;
@@ -66,6 +83,36 @@ export function SectionList({ resumeId, sections }: Props) {
   const [isPending, startTransition] = useTransition();
   const [selectedType, setSelectedType] = useState<SectionType>("experience");
   const [sectionTitle, setSectionTitle] = useState("");
+  const [optimisticOrder, setOptimisticOrder] = useState<string[] | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const sectionIds = optimisticOrder ?? sections.map((s) => s.id);
+  const orderedSections = sectionIds
+    .map((id) => sections.find((s) => s.id === id))
+    .filter(Boolean) as Section[];
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sectionIds.indexOf(active.id as string);
+    const newIndex = sectionIds.indexOf(over.id as string);
+    const newOrder = arrayMove(sectionIds, oldIndex, newIndex);
+
+    setOptimisticOrder(newOrder);
+
+    const items = newOrder.map((id, i) => ({ id, sortOrder: i }));
+
+    startTransition(async () => {
+      const result = await reorderSectionsAction(resumeId, items);
+      setOptimisticOrder(null);
+      if (!result.success) toast.error(result.error);
+    });
+  }
 
   function handleTypeChange(val: SectionType) {
     setSelectedType(val);
@@ -170,22 +217,33 @@ export function SectionList({ resumeId, sections }: Props) {
         </Dialog>
       </div>
 
-      {sections.length === 0 ? (
+      {orderedSections.length === 0 ? (
         <div className="rounded-xl border border-dashed py-10 text-center">
           <p className="text-sm text-muted-foreground">
             Aucune section. Ajoutez Expérience, Formation, Compétences…
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {sections.map((section) => (
-            <SectionEditor
-              key={section.id}
-              resumeId={resumeId}
-              section={section}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={sectionIds}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-4">
+              {orderedSections.map((section) => (
+                <SortableSectionEditor
+                  key={section.id}
+                  resumeId={resumeId}
+                  section={section}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );

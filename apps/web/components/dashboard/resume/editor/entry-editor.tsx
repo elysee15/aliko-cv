@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  GripVerticalIcon,
   TrashIcon,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ type Props = {
   resumeId: string;
   sectionType: SectionType;
   entry: Entry;
+  dragHandleProps?: Record<string, unknown>;
 };
 
 const showDates = new Set<SectionType>([
@@ -55,7 +57,7 @@ const showOrganization = new Set<SectionType>([
   "volunteering",
 ]);
 
-export function EntryEditor({ resumeId, sectionType, entry }: Props) {
+export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -96,8 +98,17 @@ export function EntryEditor({ resumeId, sectionType, entry }: Props) {
   if (!expanded) {
     return (
       <div
-        className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isPending ? "opacity-50" : ""}`}
+        className={`flex items-center gap-1 rounded-lg border px-2 py-2 ${isPending ? "opacity-50" : ""}`}
       >
+        {dragHandleProps && (
+          <button
+            type="button"
+            className="cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+            {...dragHandleProps}
+          >
+            <GripVerticalIcon className="size-3.5" />
+          </button>
+        )}
         <button
           type="button"
           className="flex flex-1 items-center gap-2 text-left text-sm"
