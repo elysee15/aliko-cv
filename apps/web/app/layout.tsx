@@ -2,6 +2,7 @@ import { Geist_Mono, Inter, Figtree } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/toaster"
 import { cn } from "@workspace/ui/lib/utils";
 
 const fontSans = Inter({
@@ -26,12 +27,15 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="fr"
       suppressHydrationWarning
       className={cn("antialiased", fontSans.variable, fontHeading.variable, fontMono.variable, "font-sans")}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

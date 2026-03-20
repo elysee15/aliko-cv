@@ -14,6 +14,7 @@ import {
   createEntry,
   updateEntry,
   deleteEntry,
+  duplicateResume,
 } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
@@ -31,6 +32,10 @@ import type {
   CreateEntryInput,
   UpdateEntryInput,
 } from "@/lib/schemas/resume";
+
+export type ActionResult<T = unknown> =
+  | { success: true; data: T }
+  | { success: false; error: string };
 
 function slugify(text: string): string {
   return text
@@ -51,80 +56,132 @@ async function requireUser() {
 // Resume
 // ---------------------------------------------------------------------------
 
-export async function createResumeAction(input: { title: string }) {
-  const user = await requireUser();
-  const parsed = createResumeSchema.parse(input);
+export async function createResumeAction(
+  input: { title: string },
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const parsed = createResumeSchema.parse(input);
+    const slug = `${slugify(parsed.title)}-${Date.now().toString(36)}`;
 
-  const slug = `${slugify(parsed.title)}-${Date.now().toString(36)}`;
+    const resume = await createResume(db, {
+      userId: user.id,
+      title: parsed.title,
+      slug,
+    });
 
-  const resume = await createResume(db, {
-    userId: user.id,
-    title: parsed.title,
-    slug,
-  });
-
-  revalidatePath("/dashboard");
-  return resume;
+    revalidatePath("/dashboard");
+    return { success: true, data: resume };
+  } catch {
+    return { success: false, error: "Impossible de créer le CV." };
+  }
 }
 
 export async function updateResumeAction(
   id: string,
-  input: { title?: string; summary?: string | null; status?: "draft" | "published" },
-) {
-  const user = await requireUser();
-  const parsed = updateResumeSchema.parse(input);
+  input: {
+    title?: string;
+    summary?: string | null;
+    status?: "draft" | "published";
+  },
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const parsed = updateResumeSchema.parse(input);
 
-  const resume = await updateResume(db, {
-    id,
-    userId: user.id,
-    ...parsed,
-  });
+    const resume = await updateResume(db, {
+      id,
+      userId: user.id,
+      ...parsed,
+    });
 
-  revalidatePath("/dashboard");
-  revalidatePath(`/dashboard/${id}`);
-  return resume;
+    revalidatePath("/dashboard");
+    revalidatePath(`/dashboard/${id}`);
+    return { success: true, data: resume };
+  } catch {
+    return { success: false, error: "Impossible de mettre à jour le CV." };
+  }
 }
 
-export async function deleteResumeAction(id: string) {
-  const user = await requireUser();
+export async function deleteResumeAction(
+  id: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const resume = await deleteResume(db, id, user.id);
+    if (!resume) return { success: false, error: "CV introuvable." };
 
-  const resume = await deleteResume(db, id, user.id);
-  if (!resume) throw new Error("CV introuvable");
+    revalidatePath("/dashboard");
+    return { success: true, data: resume };
+  } catch {
+    return { success: false, error: "Impossible de supprimer le CV." };
+  }
+}
 
-  revalidatePath("/dashboard");
-  return resume;
+export async function duplicateResumeAction(
+  id: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const slug = `copie-${Date.now().toString(36)}`;
+    const resume = await duplicateResume(db, id, user.id, slug);
+    if (!resume) return { success: false, error: "CV introuvable." };
+
+    revalidatePath("/dashboard");
+    return { success: true, data: resume };
+  } catch {
+    return { success: false, error: "Impossible de dupliquer le CV." };
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Section
 // ---------------------------------------------------------------------------
 
-export async function createSectionAction(input: CreateSectionInput) {
-  await requireUser();
-  const parsed = createSectionSchema.parse(input);
-  const section = await createSection(db, parsed);
-  revalidatePath(`/dashboard/${parsed.resumeId}`);
-  return section;
+export async function createSectionAction(
+  input: CreateSectionInput,
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const parsed = createSectionSchema.parse(input);
+    const section = await createSection(db, parsed);
+    revalidatePath(`/dashboard/${parsed.resumeId}`);
+    return { success: true, data: section };
+  } catch {
+    return { success: false, error: "Impossible de créer la section." };
+  }
 }
 
 export async function updateSectionAction(
   id: string,
   resumeId: string,
   input: UpdateSectionInput,
-) {
-  await requireUser();
-  const parsed = updateSectionSchema.parse(input);
-  const section = await updateSection(db, { id, ...parsed });
-  revalidatePath(`/dashboard/${resumeId}`);
-  return section;
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const parsed = updateSectionSchema.parse(input);
+    const section = await updateSection(db, { id, ...parsed });
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: section };
+  } catch {
+    return { success: false, error: "Impossible de modifier la section." };
+  }
 }
 
-export async function deleteSectionAction(id: string, resumeId: string) {
-  await requireUser();
-  const section = await deleteSection(db, id);
-  if (!section) throw new Error("Section introuvable");
-  revalidatePath(`/dashboard/${resumeId}`);
-  return section;
+export async function deleteSectionAction(
+  id: string,
+  resumeId: string,
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const section = await deleteSection(db, id);
+    if (!section)
+      return { success: false, error: "Section introuvable." };
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: section };
+  } catch {
+    return { success: false, error: "Impossible de supprimer la section." };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -134,30 +191,46 @@ export async function deleteSectionAction(id: string, resumeId: string) {
 export async function createEntryAction(
   input: CreateEntryInput,
   resumeId: string,
-) {
-  await requireUser();
-  const parsed = createEntrySchema.parse(input);
-  const entry = await createEntry(db, parsed);
-  revalidatePath(`/dashboard/${resumeId}`);
-  return entry;
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const parsed = createEntrySchema.parse(input);
+    const entry = await createEntry(db, parsed);
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: entry };
+  } catch {
+    return { success: false, error: "Impossible de créer l'entrée." };
+  }
 }
 
 export async function updateEntryAction(
   id: string,
   resumeId: string,
   input: UpdateEntryInput,
-) {
-  await requireUser();
-  const parsed = updateEntrySchema.parse(input);
-  const entry = await updateEntry(db, { id, ...parsed });
-  revalidatePath(`/dashboard/${resumeId}`);
-  return entry;
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const parsed = updateEntrySchema.parse(input);
+    const entry = await updateEntry(db, { id, ...parsed });
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: entry };
+  } catch {
+    return { success: false, error: "Impossible de modifier l'entrée." };
+  }
 }
 
-export async function deleteEntryAction(id: string, resumeId: string) {
-  await requireUser();
-  const entry = await deleteEntry(db, id);
-  if (!entry) throw new Error("Entrée introuvable");
-  revalidatePath(`/dashboard/${resumeId}`);
-  return entry;
+export async function deleteEntryAction(
+  id: string,
+  resumeId: string,
+): Promise<ActionResult> {
+  try {
+    await requireUser();
+    const entry = await deleteEntry(db, id);
+    if (!entry)
+      return { success: false, error: "Entrée introuvable." };
+    revalidatePath(`/dashboard/${resumeId}`);
+    return { success: true, data: entry };
+  } catch {
+    return { success: false, error: "Impossible de supprimer l'entrée." };
+  }
 }

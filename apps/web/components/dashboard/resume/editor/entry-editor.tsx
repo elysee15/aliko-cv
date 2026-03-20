@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -62,7 +63,7 @@ export function EntryEditor({ resumeId, sectionType, entry }: Props) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
-      await updateEntryAction(entry.id, resumeId, {
+      const result = await updateEntryAction(entry.id, resumeId, {
         title: fd.get("title") as string,
         subtitle: (fd.get("subtitle") as string) || null,
         organization: (fd.get("organization") as string) || null,
@@ -72,13 +73,23 @@ export function EntryEditor({ resumeId, sectionType, entry }: Props) {
         current: fd.get("current") === "on",
         description: (fd.get("description") as string) || null,
       });
-      setExpanded(false);
+      if (result.success) {
+        toast.success("Enregistré.");
+        setExpanded(false);
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteEntryAction(entry.id, resumeId);
+      const result = await deleteEntryAction(entry.id, resumeId);
+      if (result.success) {
+        toast.success("Entrée supprimée.");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 

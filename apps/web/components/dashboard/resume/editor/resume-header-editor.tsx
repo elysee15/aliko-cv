@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useTransition } from "react";
+import { toast } from "sonner";
 
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -31,17 +32,27 @@ export function ResumeHeaderEditor({ id, title, summary, status }: Props) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
-      await updateResumeAction(id, {
+      const result = await updateResumeAction(id, {
         title: fd.get("title") as string,
         summary: (fd.get("summary") as string) || null,
       });
+      if (result.success) {
+        toast.success("Enregistré.");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
   function handleToggleStatus() {
     const next = status === "draft" ? "published" : "draft";
     startTransition(async () => {
-      await updateResumeAction(id, { status: next });
+      const result = await updateResumeAction(id, { status: next });
+      if (result.success) {
+        toast.success(next === "published" ? "CV publié !" : "Repassé en brouillon.");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 

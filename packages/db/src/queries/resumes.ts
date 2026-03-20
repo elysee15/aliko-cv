@@ -207,3 +207,69 @@ export async function deleteEntry(db: Database, id: string) {
     .returning();
   return row;
 }
+
+// ---------------------------------------------------------------------------
+// Duplicate
+// ---------------------------------------------------------------------------
+
+export async function duplicateResume(
+  db: Database,
+  id: string,
+  userId: string,
+  newSlug: string,
+) {
+  const source = await db.query.resume.findFirst({
+    where: and(eq(resume.id, id), eq(resume.userId, userId)),
+    with: {
+      sections: {
+        with: { entries: true },
+      },
+    },
+  });
+
+  if (!source) return null;
+
+  const [newResume] = await db
+    .insert(resume)
+    .values({
+      userId,
+      title: `${source.title} (copie)`,
+      slug: newSlug,
+      summary: source.summary,
+      status: "draft",
+    })
+    .returning();
+
+  for (const section of source.sections) {
+    const [newSection] = await db
+      .insert(resumeSection)
+      .values({
+        resumeId: newResume!.id,
+        type: section.type,
+        title: section.title,
+        sortOrder: section.sortOrder,
+        visible: section.visible,
+      })
+      .returning();
+
+    if (section.entries.length > 0) {
+      await db.insert(resumeEntry).values(
+        section.entries.map((e) => ({
+          sectionId: newSection!.id,
+          title: e.title,
+          subtitle: e.subtitle,
+          organization: e.organization,
+          location: e.location,
+          startDate: e.startDate,
+          endDate: e.endDate,
+          current: e.current,
+          description: e.description,
+          sortOrder: e.sortOrder,
+          visible: e.visible,
+        })),
+      );
+    }
+  }
+
+  return newResume;
+}
