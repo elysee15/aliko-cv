@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { FileTextIcon } from "lucide-react";
@@ -7,7 +8,11 @@ import { getResumesByUser } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
 import { CreateResumeDialog } from "@/components/dashboard/resume/create-resume-dialog";
-import { ResumeCard } from "@/components/dashboard/resume/resume-card";
+import { ResumeList } from "@/components/dashboard/resume/resume-list";
+
+export const metadata: Metadata = {
+  title: "Mes CV",
+};
 
 export default async function DashboardPage() {
   const session = await auth.api.getSession({
@@ -43,17 +48,7 @@ export default async function DashboardPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {resumes.map((r) => (
-            <ResumeCard
-              key={r.id}
-              id={r.id}
-              title={r.title}
-              status={r.status}
-              updatedAt={r.updatedAt}
-            />
-          ))}
-        </div>
+        <ResumeList resumes={resumes} />
       )}
     </div>
   );

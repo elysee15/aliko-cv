@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Réinitialiser le mot de passe",
+};
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
