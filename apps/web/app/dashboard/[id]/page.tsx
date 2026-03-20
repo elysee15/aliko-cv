@@ -10,8 +10,10 @@ import { auth } from "@/lib/auth";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
 import { ResumeHeaderEditor } from "@/components/dashboard/resume/editor/resume-header-editor";
+import { TemplateSelector } from "@/components/dashboard/resume/editor/template-selector";
 import { SectionList } from "@/components/dashboard/resume/editor/section-list";
 import { CopyLinkButton } from "@/components/resume/copy-link-button";
+import type { TemplateType } from "@/lib/schemas/resume";
 
 type Params = Promise<{ id: string }>;
 
@@ -70,6 +72,11 @@ export default async function ResumeEditorPage({
         title={resume.title}
         summary={resume.summary}
         status={resume.status}
+      />
+
+      <TemplateSelector
+        resumeId={resume.id}
+        currentTemplate={(resume.template ?? "classic") as TemplateType}
       />
 
       <SectionList resumeId={resume.id} sections={resume.sections} />

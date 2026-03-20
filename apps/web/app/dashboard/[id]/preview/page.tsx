@@ -11,6 +11,7 @@ import { Button } from "@workspace/ui/components/button";
 import { ResumePreview } from "@/components/resume/resume-preview";
 import { PrintButton } from "@/components/resume/print-button";
 import { CopyLinkButton } from "@/components/resume/copy-link-button";
+import type { TemplateType } from "@/lib/schemas/resume";
 
 type Params = Promise<{ id: string }>;
 
@@ -54,6 +55,7 @@ export default async function ResumePreviewPage({
 
       <div className="rounded-xl border shadow-sm print:border-none print:shadow-none">
         <ResumePreview
+          template={(resume.template ?? "classic") as TemplateType}
           resume={{
             title: resume.title,
             summary: resume.summary,
