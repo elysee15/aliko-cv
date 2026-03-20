@@ -2,7 +2,13 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { MoreHorizontalIcon, TrashIcon, FileTextIcon } from "lucide-react";
+import { toast } from "sonner";
+import {
+  MoreHorizontalIcon,
+  TrashIcon,
+  CopyIcon,
+  FileTextIcon,
+} from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
@@ -20,7 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 
-import { deleteResumeAction } from "@/app/actions/resume";
+import {
+  deleteResumeAction,
+  duplicateResumeAction,
+} from "@/app/actions/resume";
 
 type ResumeCardProps = {
   id: string;
@@ -49,7 +58,23 @@ export function ResumeCard({ id, title, status, updatedAt }: ResumeCardProps) {
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteResumeAction(id);
+      const result = await deleteResumeAction(id);
+      if (result.success) {
+        toast.success("CV supprimé.");
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function handleDuplicate() {
+    startTransition(async () => {
+      const result = await duplicateResumeAction(id);
+      if (result.success) {
+        toast.success("CV dupliqué !");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
@@ -83,7 +108,14 @@ export function ResumeCard({ id, title, status, updatedAt }: ResumeCardProps) {
                   <span className="sr-only">Actions</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+                  <DropdownMenuItem onClick={handleDuplicate}>
+                    <CopyIcon />
+                    Dupliquer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={handleDelete}
+                  >
                     <TrashIcon />
                     Supprimer
                   </DropdownMenuItem>

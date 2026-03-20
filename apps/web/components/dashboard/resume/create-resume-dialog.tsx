@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
@@ -39,11 +41,20 @@ export function CreateResumeDialog() {
     defaultValues: { title: "" },
   });
 
+  const router = useRouter();
+
   function onSubmit(data: CreateResumeInput) {
     startTransition(async () => {
-      await createResumeAction(data);
-      reset();
-      setOpen(false);
+      const result = await createResumeAction(data);
+      if (result.success) {
+        toast.success("CV créé !");
+        reset();
+        setOpen(false);
+        const resume = result.data as { id: string };
+        router.push(`/dashboard/${resume.id}`);
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 

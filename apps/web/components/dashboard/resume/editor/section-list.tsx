@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
@@ -74,15 +75,20 @@ export function SectionList({ resumeId, sections }: Props) {
   function handleCreate() {
     if (!sectionTitle.trim()) return;
     startTransition(async () => {
-      await createSectionAction({
+      const result = await createSectionAction({
         resumeId,
         type: selectedType,
         title: sectionTitle,
         sortOrder: sections.length,
       });
-      setOpen(false);
-      setSectionTitle("");
-      setSelectedType("experience");
+      if (result.success) {
+        toast.success("Section ajoutée.");
+        setOpen(false);
+        setSectionTitle("");
+        setSelectedType("experience");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 

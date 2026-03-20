@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
@@ -41,7 +42,7 @@ export function AddEntryDialog({
     if (!title) return;
 
     startTransition(async () => {
-      await createEntryAction(
+      const result = await createEntryAction(
         {
           sectionId,
           title,
@@ -49,6 +50,11 @@ export function AddEntryDialog({
         },
         resumeId,
       );
+      if (result.success) {
+        toast.success("Entrée ajoutée.");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 

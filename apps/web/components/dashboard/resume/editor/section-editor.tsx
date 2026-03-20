@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -59,15 +60,21 @@ export function SectionEditor({ resumeId, section }: Props) {
 
   function handleToggleVisibility() {
     startTransition(async () => {
-      await updateSectionAction(section.id, resumeId, {
+      const result = await updateSectionAction(section.id, resumeId, {
         visible: !section.visible,
       });
+      if (!result.success) toast.error(result.error);
     });
   }
 
   function handleDelete() {
     startTransition(async () => {
-      await deleteSectionAction(section.id, resumeId);
+      const result = await deleteSectionAction(section.id, resumeId);
+      if (result.success) {
+        toast.success("Section supprimée.");
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
