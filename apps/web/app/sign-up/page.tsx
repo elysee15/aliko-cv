@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Créer un compte",
+};
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 

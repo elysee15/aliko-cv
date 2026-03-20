@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { headers } from "next/headers";
+
+export const metadata: Metadata = {
+  title: "Paramètres",
+};
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";

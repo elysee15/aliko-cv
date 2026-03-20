@@ -19,9 +19,22 @@ export async function generateMetadata({
 
   if (!resume) return { title: "CV introuvable" };
 
+  const title = `${resume.user.name} — ${resume.title}`;
+  const description = resume.summary ?? `CV de ${resume.user.name}`;
+
   return {
-    title: `${resume.user.name} — ${resume.title}`,
-    description: resume.summary ?? `CV de ${resume.user.name}`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
   };
 }
 

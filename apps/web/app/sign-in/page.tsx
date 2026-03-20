@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Connexion",
+};
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { SignInForm } from "@/components/auth/sign-in-form";
 
