@@ -1,12 +1,17 @@
-import { Manrope, Geist_Mono } from "next/font/google"
+import { Geist_Mono, Inter, Figtree } from "next/font/google"
 
 import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@workspace/ui/lib/utils";
 
-const fontSans = Manrope({
+const fontSans = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+})
+
+const fontHeading = Figtree({
+  subsets: ["latin"],
+  variable: "--font-heading",
 })
 
 const fontMono = Geist_Mono({
@@ -23,7 +28,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", fontSans.variable)}
+      className={cn("antialiased", fontSans.variable, fontHeading.variable, fontMono.variable, "font-sans")}
     >
       <body>
         <ThemeProvider>{children}</ThemeProvider>
