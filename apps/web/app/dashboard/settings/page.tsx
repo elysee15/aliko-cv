@@ -6,6 +6,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
+import { ChangePasswordForm } from "@/components/dashboard/settings/change-password-form";
 
 export default async function SettingsPage() {
   const session = await auth.api.getSession({
@@ -30,6 +31,8 @@ export default async function SettingsPage() {
         email={session.user.email}
         image={session.user.image ?? null}
       />
+
+      <ChangePasswordForm />
     </div>
   );
 }
