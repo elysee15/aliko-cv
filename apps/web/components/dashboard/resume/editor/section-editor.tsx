@@ -45,7 +45,10 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { AutosaveIndicator } from "@/components/autosave-indicator";
 import { SortableEntryEditor } from "./sortable-entry-editor";
 import { AddEntryDialog } from "./add-entry-dialog";
-import { SectionComments } from "./section-comments";
+import {
+  SectionCommentTrigger,
+  SectionCommentPanel,
+} from "./section-comments";
 
 type Entry = {
   id: string;
@@ -82,6 +85,8 @@ export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleP
     string[] | null
   >(null);
   const [sectionTitle, setSectionTitle] = useState(section.title);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [liveCommentCount, setLiveCommentCount] = useState(commentCount);
 
   const entrySensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -191,10 +196,10 @@ export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleP
         </div>
         <CardAction>
           <div className="flex items-center gap-1">
-            <SectionComments
-              sectionId={section.id}
-              resumeId={resumeId}
-              commentCount={commentCount}
+            <SectionCommentTrigger
+              commentCount={liveCommentCount}
+              open={commentsOpen}
+              onToggle={() => setCommentsOpen((v) => !v)}
             />
             <Button
               variant="ghost"
@@ -255,6 +260,14 @@ export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleP
             resumeId={resumeId}
             nextSortOrder={section.entries.length}
           />
+
+          {commentsOpen && (
+            <SectionCommentPanel
+              sectionId={section.id}
+              resumeId={resumeId}
+              onCountChange={setLiveCommentCount}
+            />
+          )}
         </CardContent>
       )}
     </Card>

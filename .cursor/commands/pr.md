@@ -1,1 +1,1 @@
-Your job is to create a pull request with a descriptive title, always use Github CLI. if you haven't make a commit, do that first. Before doing the commit, run lint script and build to code to verify if there are no bugs left.
+Your job is to create a pull request with a descriptive title, always use Github CLI. if you haven't make a commit, do that first. Before doing the commit, run lint script and build to code to verify if there are no bugs left. commit should always be in english.
