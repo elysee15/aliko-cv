@@ -1,9 +1,40 @@
 import type { TemplateProps, Section } from "./types";
-import { datedSections, formatDate } from "./types";
+import { datedSections, tagSections, formatDate } from "./types";
+import { Md } from "./markdown";
+
+function TagSection({ section }: { section: Section }) {
+  const visibleEntries = section.entries.filter((e) => e.visible);
+  if (visibleEntries.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+        {section.title}
+      </h2>
+      <div className="flex flex-wrap gap-2">
+        {visibleEntries.map((entry) => (
+          <span
+            key={entry.id}
+            className="text-sm"
+          >
+            {entry.title}
+            {entry.subtitle && (
+              <span className="text-muted-foreground"> ({entry.subtitle})</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function SectionBlock({ section }: { section: Section }) {
   const visibleEntries = section.entries.filter((e) => e.visible);
   if (visibleEntries.length === 0 && section.type !== "custom") return null;
+
+  if (tagSections.has(section.type)) {
+    return <TagSection section={section} />;
+  }
 
   const hasDates = datedSections.has(section.type);
 
@@ -36,11 +67,7 @@ function SectionBlock({ section }: { section: Section }) {
             {entry.subtitle && (
               <p className="text-sm text-muted-foreground">{entry.subtitle}</p>
             )}
-            {entry.description && (
-              <p className="text-sm leading-relaxed whitespace-pre-line">
-                {entry.description}
-              </p>
-            )}
+            {entry.description && <Md>{entry.description}</Md>}
           </div>
         ))}
       </div>

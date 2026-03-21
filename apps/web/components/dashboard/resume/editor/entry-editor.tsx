@@ -13,7 +13,7 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
+import { Field, FieldLabel, FieldDescription } from "@workspace/ui/components/field";
 import { Label } from "@workspace/ui/components/label";
 
 import {
@@ -60,6 +60,12 @@ const showOrganization = new Set<SectionType>([
   "volunteering",
 ]);
 
+const tagTypes = new Set<SectionType>([
+  "skills",
+  "languages",
+  "interests",
+]);
+
 type EntryFormData = {
   title: string;
   subtitle: string;
@@ -84,10 +90,17 @@ function entryToForm(entry: Entry): EntryFormData {
   };
 }
 
+const subtitleLabels: Partial<Record<SectionType, string>> = {
+  skills: "Niveau (ex: Expert, Avancé…)",
+  languages: "Niveau (ex: Courant, Natif…)",
+  interests: "Précision",
+};
+
 export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<EntryFormData>(() => entryToForm(entry));
+  const isTag = tagTypes.has(sectionType);
 
   const handleSave = useCallback(
     async (data: EntryFormData) => {
@@ -148,7 +161,10 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
         >
           <ChevronDownIcon className="size-3.5 text-muted-foreground" />
           <span className="font-medium">{form.title || entry.title}</span>
-          {(form.organization || entry.organization) && (
+          {isTag && form.subtitle && (
+            <span className="text-muted-foreground">({form.subtitle})</span>
+          )}
+          {!isTag && (form.organization || entry.organization) && (
             <span className="text-muted-foreground">
               — {form.organization || entry.organization}
             </span>
@@ -163,6 +179,57 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
         >
           <TrashIcon />
         </Button>
+      </div>
+    );
+  }
+
+  if (isTag) {
+    return (
+      <div
+        className={`space-y-3 rounded-lg border p-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
+      >
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-sm font-medium"
+            onClick={() => setExpanded(false)}
+          >
+            <ChevronUpIcon className="size-3.5 text-muted-foreground" />
+            Modifier
+          </button>
+          <div className="flex items-center gap-2">
+            <AutosaveIndicator status={status} />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={handleDelete}
+              className="text-destructive hover:text-destructive"
+              aria-label="Supprimer l'entrée"
+            >
+              <TrashIcon />
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field>
+            <FieldLabel><Label>Nom</Label></FieldLabel>
+            <Input
+              value={form.title}
+              onChange={(e) => update({ title: e.target.value })}
+              placeholder={sectionType === "skills" ? "Ex: React" : sectionType === "languages" ? "Ex: Anglais" : "Ex: Photographie"}
+              required
+            />
+          </Field>
+          <Field>
+            <FieldLabel><Label>{subtitleLabels[sectionType] ?? "Précision"}</Label></FieldLabel>
+            <Input
+              value={form.subtitle}
+              onChange={(e) => update({ subtitle: e.target.value })}
+              placeholder={sectionType === "skills" ? "Ex: Expert" : sectionType === "languages" ? "Ex: Courant (C1)" : ""}
+            />
+          </Field>
+        </div>
       </div>
     );
   }
@@ -276,6 +343,9 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
           placeholder="Décrivez cette expérience, ce projet…"
           rows={3}
         />
+        <FieldDescription>
+          Supporte le markdown : **gras**, *italique*, - listes, [liens](url)
+        </FieldDescription>
       </Field>
 
       <Button

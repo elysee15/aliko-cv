@@ -1,5 +1,6 @@
 import type { TemplateProps, Section, ContactInfo } from "./types";
-import { datedSections, formatDate } from "./types";
+import { datedSections, tagSections, formatDate } from "./types";
+import { Md } from "./markdown";
 
 function ContactLine({ email, contact }: { email: string; contact?: ContactInfo }) {
   const items = [email];
@@ -39,9 +40,39 @@ function DateRange({
   );
 }
 
+function TagSection({ section }: { section: Section }) {
+  const visibleEntries = section.entries.filter((e) => e.visible);
+  if (visibleEntries.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h2 className="border-b pb-1 text-sm font-semibold uppercase tracking-wider">
+        {section.title}
+      </h2>
+      <div className="flex flex-wrap gap-1.5">
+        {visibleEntries.map((entry) => (
+          <span
+            key={entry.id}
+            className="rounded-md border px-2 py-0.5 text-xs"
+          >
+            {entry.title}
+            {entry.subtitle && (
+              <span className="ml-1 text-muted-foreground">({entry.subtitle})</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SectionBlock({ section }: { section: Section }) {
   const visibleEntries = section.entries.filter((e) => e.visible);
   if (visibleEntries.length === 0 && section.type !== "custom") return null;
+
+  if (tagSections.has(section.type)) {
+    return <TagSection section={section} />;
+  }
 
   const hasDates = datedSections.has(section.type);
 
@@ -76,11 +107,7 @@ function SectionBlock({ section }: { section: Section }) {
             {entry.location && (
               <p className="text-xs text-muted-foreground">{entry.location}</p>
             )}
-            {entry.description && (
-              <p className="mt-1 text-sm whitespace-pre-line">
-                {entry.description}
-              </p>
-            )}
+            {entry.description && <Md>{entry.description}</Md>}
           </div>
         ))}
       </div>

@@ -40,6 +40,12 @@ export type TemplateProps = {
   resume: ResumeData;
 };
 
+export const tagSections = new Set<SectionType>([
+  "skills",
+  "languages",
+  "interests",
+]);
+
 export const datedSections = new Set<SectionType>([
   "experience",
   "education",
