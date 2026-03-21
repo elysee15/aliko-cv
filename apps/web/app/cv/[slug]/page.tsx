@@ -49,7 +49,7 @@ export default async function PublicResumePage({
   if (!resume) notFound();
 
   return (
-    <div className="min-h-svh bg-muted/30 py-8 print:bg-white print:py-0">
+    <div className="min-h-svh bg-muted/30 px-4 py-8 print:bg-white print:px-0 print:py-0">
       <div className="mx-auto max-w-[210mm]">
         <div className="rounded-xl border bg-background shadow-sm print:border-none print:shadow-none">
           <ResumePreview

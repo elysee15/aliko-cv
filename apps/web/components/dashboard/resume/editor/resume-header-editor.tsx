@@ -7,6 +7,7 @@ import {
   GlobeIcon,
   LinkedinIcon,
   GithubIcon,
+  LinkIcon,
 } from "lucide-react";
 
 import { Input } from "@workspace/ui/components/input";
@@ -29,6 +30,7 @@ import { AutosaveIndicator } from "@/components/autosave-indicator";
 type Props = {
   id: string;
   title: string;
+  slug: string;
   summary: string | null;
   phone: string | null;
   website: string | null;
@@ -37,9 +39,19 @@ type Props = {
   status: "draft" | "published";
 };
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 export function ResumeHeaderEditor({
   id,
   title,
+  slug,
   summary,
   phone,
   website,
@@ -49,6 +61,7 @@ export function ResumeHeaderEditor({
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const [currentTitle, setCurrentTitle] = useState(title);
+  const [currentSlug, setCurrentSlug] = useState(slug);
   const [currentSummary, setCurrentSummary] = useState(summary ?? "");
   const [currentPhone, setCurrentPhone] = useState(phone ?? "");
   const [currentWebsite, setCurrentWebsite] = useState(website ?? "");
@@ -58,13 +71,14 @@ export function ResumeHeaderEditor({
   const autosaveData = useMemo(
     () => ({
       title: currentTitle,
+      slug: currentSlug,
       summary: currentSummary || null,
       phone: currentPhone || null,
       website: currentWebsite || null,
       linkedin: currentLinkedin || null,
       github: currentGithub || null,
     }),
-    [currentTitle, currentSummary, currentPhone, currentWebsite, currentLinkedin, currentGithub],
+    [currentTitle, currentSlug, currentSummary, currentPhone, currentWebsite, currentLinkedin, currentGithub],
   );
 
   const handleAutoSave = useCallback(
@@ -113,6 +127,24 @@ export function ResumeHeaderEditor({
               onChange={(e) => setCurrentTitle(e.target.value)}
               required
             />
+          </Field>
+
+          <Field>
+            <FieldLabel>
+              <Label className="inline-flex items-center gap-1.5">
+                <LinkIcon className="size-3.5" /> URL publique
+              </Label>
+            </FieldLabel>
+            <div className="flex items-center gap-1.5">
+              <span className="shrink-0 text-xs text-muted-foreground">/cv/</span>
+              <Input
+                value={currentSlug}
+                onChange={(e) => setCurrentSlug(slugify(e.target.value))}
+              />
+            </div>
+            <FieldDescription>
+              Le lien public de votre CV sera /cv/{currentSlug}
+            </FieldDescription>
           </Field>
 
           <Field>

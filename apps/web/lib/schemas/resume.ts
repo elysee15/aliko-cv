@@ -34,6 +34,12 @@ export const updateResumeSchema = z.object({
     .min(1, "Le titre est requis")
     .max(200, "Le titre ne doit pas dépasser 200 caractères")
     .optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Le slug ne peut contenir que des lettres minuscules, chiffres et tirets")
+    .optional(),
   summary: z.string().max(2000).nullable().optional(),
   phone: z.string().max(30).nullable().optional(),
   website: z.string().max(200).nullable().optional(),
