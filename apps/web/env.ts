@@ -6,7 +6,7 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.string().url().optional(),
     VERCEL_URL: z.string().optional(),
-    TELEGRAM_BOT_TOKEN: z.string().optional(),
+    TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
   },
   client: {
     NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),

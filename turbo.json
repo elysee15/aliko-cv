@@ -15,7 +15,8 @@
         "POSTGRES_URL",
         "DATABASE_URL",
         "RESEND_API_KEY",
-        "RESEND_FROM_EMAIL"
+        "RESEND_FROM_EMAIL",
+        "TELEGRAM_BOT_TOKEN"
       ]
     },
     "lint": {
@@ -47,7 +48,8 @@
         "POSTGRES_URL",
         "DATABASE_URL",
         "RESEND_API_KEY",
-        "RESEND_FROM_EMAIL"
+        "RESEND_FROM_EMAIL",
+        "TELEGRAM_BOT_TOKEN"
       ]
     },
     "push": {
