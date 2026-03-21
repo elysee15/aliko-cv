@@ -5,12 +5,13 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { db } from "@aliko-cv/db/client";
-import { getApiKeysByUser } from "@aliko-cv/db/queries";
+import { getApiKeysByUser, getPortfolioByUser } from "@aliko-cv/db/queries";
 import { Button } from "@workspace/ui/components/button";
 import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
 import { ChangePasswordForm } from "@/components/dashboard/settings/change-password-form";
 import { ApiKeyManager } from "@/components/dashboard/settings/api-key-manager";
+import { PortfolioSettings } from "@/components/dashboard/settings/portfolio-settings";
 import { TelegramLink } from "@/components/dashboard/settings/telegram-link";
 import { DataManagement } from "@/components/dashboard/settings/data-management";
 
@@ -25,7 +26,10 @@ export default async function SettingsPage() {
 
   if (!session?.user) redirect("/sign-in");
 
-  const apiKeys = await getApiKeysByUser(db, session.user.id);
+  const [apiKeys, portfolio] = await Promise.all([
+    getApiKeysByUser(db, session.user.id),
+    getPortfolioByUser(db, session.user.id),
+  ]);
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -45,6 +49,13 @@ export default async function SettingsPage() {
       />
 
       <ChangePasswordForm />
+
+      <PortfolioSettings
+        enabled={portfolio?.enabled ?? false}
+        slug={portfolio?.slug ?? `portfolio-${Date.now().toString(36)}`}
+        headline={portfolio?.headline ?? null}
+        bio={portfolio?.bio ?? null}
+      />
 
       <ApiKeyManager keys={apiKeys} />
 
