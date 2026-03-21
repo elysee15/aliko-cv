@@ -20,6 +20,7 @@ import {
 } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
+import { dispatchWebhook } from "@/lib/webhooks";
 import {
   createResumeSchema,
   updateResumeSchema,
@@ -72,6 +73,13 @@ export async function createResumeAction(
       slug,
     });
 
+    if (resume) {
+      dispatchWebhook(user.id, "resume.created", {
+        resumeId: resume.id,
+        title: resume.title,
+      });
+    }
+
     revalidatePath("/dashboard");
     return { success: true, data: resume };
   } catch {
@@ -103,6 +111,14 @@ export async function updateResumeAction(
       ...parsed,
     });
 
+    const event =
+      parsed.status === "published" ? "resume.published" : "resume.updated";
+    dispatchWebhook(user.id, event, {
+      resumeId: id,
+      ...(parsed.title && { title: parsed.title }),
+      ...(parsed.status && { status: parsed.status }),
+    });
+
     revalidatePath("/dashboard");
     revalidatePath(`/dashboard/${id}`);
     return { success: true, data: resume };
@@ -118,6 +134,8 @@ export async function deleteResumeAction(
     const user = await requireUser();
     const resume = await deleteResume(db, id, user.id);
     if (!resume) return { success: false, error: "CV introuvable." };
+
+    dispatchWebhook(user.id, "resume.deleted", { resumeId: id });
 
     revalidatePath("/dashboard");
     return { success: true, data: resume };
