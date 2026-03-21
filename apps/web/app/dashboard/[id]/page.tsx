@@ -15,6 +15,7 @@ import { SectionList } from "@/components/dashboard/resume/editor/section-list";
 import { CopyLinkButton } from "@/components/resume/copy-link-button";
 import { PrintButton } from "@/components/resume/print-button";
 import { ExportJsonButton } from "@/components/resume/export-json-button";
+import { AtsAnalyzer } from "@/components/resume/ats-analyzer";
 import { ResumePreview } from "@/components/resume/resume-preview";
 import { SplitViewShell } from "@/components/dashboard/resume/editor/split-view-shell";
 import type { TemplateType } from "@/lib/schemas/resume";
@@ -61,6 +62,7 @@ export default async function ResumeEditorPage({
         {resume.status === "published" && (
           <CopyLinkButton path={`/cv/${resume.slug}`} />
         )}
+        <AtsAnalyzer resumeId={resume.id} />
         <ExportJsonButton resumeId={resume.id} />
         <PrintButton />
       </div>
