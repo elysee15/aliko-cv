@@ -8,6 +8,7 @@ import {
   LinkedinIcon,
   GithubIcon,
   LinkIcon,
+  RefreshCwIcon,
 } from "lucide-react";
 
 import { Input } from "@workspace/ui/components/input";
@@ -141,6 +142,19 @@ export function ResumeHeaderEditor({
                 value={currentSlug}
                 onChange={(e) => setCurrentSlug(slugify(e.target.value))}
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                title="Régénérer le slug"
+                onClick={() =>
+                  setCurrentSlug(
+                    `${slugify(currentTitle)}-${Date.now().toString(36)}`,
+                  )
+                }
+              >
+                <RefreshCwIcon className="size-3.5" />
+              </Button>
             </div>
             <FieldDescription>
               Le lien public de votre CV sera /cv/{currentSlug}

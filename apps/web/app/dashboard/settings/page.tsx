@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-
-export const metadata: Metadata = {
-  title: "Paramètres",
-};
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 
+import { db } from "@aliko-cv/db/client";
+import { getApiKeysByUser } from "@aliko-cv/db/queries";
 import { Button } from "@workspace/ui/components/button";
 import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
 import { ChangePasswordForm } from "@/components/dashboard/settings/change-password-form";
+import { ApiKeyManager } from "@/components/dashboard/settings/api-key-manager";
+
+export const metadata: Metadata = {
+  title: "Paramètres",
+};
 
 export default async function SettingsPage() {
   const session = await auth.api.getSession({
@@ -19,6 +22,8 @@ export default async function SettingsPage() {
   });
 
   if (!session?.user) redirect("/sign-in");
+
+  const apiKeys = await getApiKeysByUser(db, session.user.id);
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -38,6 +43,8 @@ export default async function SettingsPage() {
       />
 
       <ChangePasswordForm />
+
+      <ApiKeyManager keys={apiKeys} />
     </div>
   );
 }
