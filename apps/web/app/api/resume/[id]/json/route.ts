@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { db } from "@aliko-cv/db/client";
 import { getResumeById } from "@aliko-cv/db/queries";
 import { auth } from "@/lib/auth";
+import { dispatchWebhook } from "@/lib/webhooks";
 
 type Params = { id: string };
 
@@ -57,6 +58,11 @@ export async function GET(
     })),
     exportedAt: new Date().toISOString(),
   };
+
+  dispatchWebhook(session.user.id, "resume.exported", {
+    resumeId: id,
+    format: "json",
+  });
 
   return NextResponse.json(payload);
 }

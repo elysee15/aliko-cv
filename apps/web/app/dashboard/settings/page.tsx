@@ -5,7 +5,11 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 
 import { db } from "@aliko-cv/db/client";
-import { getApiKeysByUser, getPortfolioByUser } from "@aliko-cv/db/queries";
+import {
+  getApiKeysByUser,
+  getPortfolioByUser,
+  getWebhooksByUser,
+} from "@aliko-cv/db/queries";
 import { Button } from "@workspace/ui/components/button";
 import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
@@ -13,6 +17,7 @@ import { ChangePasswordForm } from "@/components/dashboard/settings/change-passw
 import { ApiKeyManager } from "@/components/dashboard/settings/api-key-manager";
 import { PortfolioSettings } from "@/components/dashboard/settings/portfolio-settings";
 import { TelegramLink } from "@/components/dashboard/settings/telegram-link";
+import { WebhookManager } from "@/components/dashboard/settings/webhook-manager";
 import { DataManagement } from "@/components/dashboard/settings/data-management";
 
 export const metadata: Metadata = {
@@ -26,9 +31,10 @@ export default async function SettingsPage() {
 
   if (!session?.user) redirect("/sign-in");
 
-  const [apiKeys, portfolio] = await Promise.all([
+  const [apiKeys, portfolio, webhooks] = await Promise.all([
     getApiKeysByUser(db, session.user.id),
     getPortfolioByUser(db, session.user.id),
+    getWebhooksByUser(db, session.user.id),
   ]);
 
   return (
@@ -58,6 +64,8 @@ export default async function SettingsPage() {
       />
 
       <ApiKeyManager keys={apiKeys} />
+
+      <WebhookManager webhooks={webhooks} />
 
       <TelegramLink />
 

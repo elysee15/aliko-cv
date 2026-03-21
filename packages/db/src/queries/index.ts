@@ -4,3 +4,4 @@ export * from "./account";
 export * from "./telegram";
 export * from "./portfolio";
 export * from "./cover-letters";
+export * from "./webhooks";

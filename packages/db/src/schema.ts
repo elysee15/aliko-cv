@@ -4,3 +4,4 @@ export * from "./apikey-schema";
 export * from "./telegram-schema";
 export * from "./portfolio-schema";
 export * from "./coverletter-schema";
+export * from "./webhook-schema";
