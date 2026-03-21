@@ -6,3 +6,4 @@ export * from "./portfolio-schema";
 export * from "./coverletter-schema";
 export * from "./webhook-schema";
 export * from "./comment-schema";
+export * from "./application-schema";

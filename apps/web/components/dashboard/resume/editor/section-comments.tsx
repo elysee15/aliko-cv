@@ -48,7 +48,7 @@ export function SectionCommentTrigger({
     <button
       type="button"
       onClick={onToggle}
-      className={`flex items-center gap-1 rounded-md px-1.5 py-1 text-xs transition-colors ${
+      className={`flex items-center gap-1 px-1.5 py-1 text-xs transition-colors ${
         open
           ? "bg-primary/10 text-primary"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"

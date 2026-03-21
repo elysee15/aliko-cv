@@ -60,7 +60,7 @@ export function ResumeList({ resumes }: { resumes: Resume[] }) {
               variant="ghost"
               size="sm"
               className={cn(
-                "h-7 rounded-md px-2.5 text-xs font-medium",
+                "h-7 px-2.5 text-xs font-medium",
                 statusFilter === f.value &&
                   "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
               )}
