@@ -28,8 +28,26 @@ type Props = {
   nextSortOrder: number;
 };
 
+const placeholders: Partial<Record<SectionType, string>> = {
+  experience: "Ex : Développeur Full-Stack",
+  education: "Ex : Master Informatique",
+  skills: "Ex : React, TypeScript, Node.js",
+  languages: "Ex : Anglais",
+  projects: "Ex : Application mobile e-commerce",
+  certifications: "Ex : AWS Solutions Architect",
+  volunteering: "Ex : Bénévole Croix-Rouge",
+  interests: "Ex : Photographie, Randonnée",
+};
+
+const buttonLabels: Partial<Record<SectionType, string>> = {
+  skills: "Ajouter une compétence",
+  languages: "Ajouter une langue",
+  interests: "Ajouter un intérêt",
+};
+
 export function AddEntryDialog({
   sectionId,
+  sectionType,
   resumeId,
   nextSortOrder,
 }: Props) {
@@ -64,7 +82,7 @@ export function AddEntryDialog({
         render={
           <Button variant="outline" size="sm" className="w-full">
             <PlusIcon data-icon="inline-start" />
-            Ajouter une entrée
+            {buttonLabels[sectionType] ?? "Ajouter une entrée"}
           </Button>
         }
       />
@@ -82,7 +100,7 @@ export function AddEntryDialog({
             </FieldLabel>
             <Input
               name="title"
-              placeholder="Ex: Développeur Full-Stack"
+              placeholder={placeholders[sectionType] ?? "Ex : Titre"}
               autoFocus
               required
             />

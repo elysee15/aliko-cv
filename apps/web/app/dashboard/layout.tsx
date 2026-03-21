@@ -5,6 +5,7 @@ import { SettingsIcon, SparklesIcon } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { auth } from "@/lib/auth";
 
 export default async function DashboardLayout({
@@ -35,6 +36,7 @@ export default async function DashboardLayout({
             <span className="text-sm text-muted-foreground">
               {session.user.name || session.user.email}
             </span>
+            <ThemeToggle />
             <Link href="/dashboard/settings">
               <Button variant="ghost" size="icon-sm" title="Paramètres">
                 <SettingsIcon />

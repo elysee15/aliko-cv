@@ -1,5 +1,6 @@
 import type { TemplateProps, Section } from "./types";
-import { datedSections, formatDate } from "./types";
+import { datedSections, tagSections, formatDate } from "./types";
+import { Md } from "./markdown";
 
 function DateRange({
   startDate,
@@ -20,9 +21,40 @@ function DateRange({
   );
 }
 
+function TagSection({ section }: { section: Section }) {
+  const visibleEntries = section.entries.filter((e) => e.visible);
+  if (visibleEntries.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-primary">
+        <span className="inline-block h-0.5 w-4 rounded bg-primary" />
+        {section.title}
+      </h2>
+      <div className="flex flex-wrap gap-1.5 pl-6">
+        {visibleEntries.map((entry) => (
+          <span
+            key={entry.id}
+            className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+          >
+            {entry.title}
+            {entry.subtitle && (
+              <span className="ml-1 font-normal opacity-70">({entry.subtitle})</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SectionBlock({ section }: { section: Section }) {
   const visibleEntries = section.entries.filter((e) => e.visible);
   if (visibleEntries.length === 0 && section.type !== "custom") return null;
+
+  if (tagSections.has(section.type)) {
+    return <TagSection section={section} />;
+  }
 
   const hasDates = datedSections.has(section.type);
 
@@ -60,11 +92,7 @@ function SectionBlock({ section }: { section: Section }) {
             {entry.location && (
               <p className="text-xs text-muted-foreground">{entry.location}</p>
             )}
-            {entry.description && (
-              <p className="mt-1 text-sm whitespace-pre-line">
-                {entry.description}
-              </p>
-            )}
+            {entry.description && <Md>{entry.description}</Md>}
           </div>
         ))}
       </div>
