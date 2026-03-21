@@ -56,7 +56,7 @@ export function CoverLetterCard({
 
   return (
     <div
-      className="group flex cursor-pointer flex-col gap-2 rounded-xl border p-4 transition-colors hover:bg-muted/50"
+      className="group flex cursor-pointer flex-col gap-2 rounded-none border p-4 transition-colors hover:bg-muted/50"
       onClick={() => router.push(`/dashboard/cover-letters/${id}`)}
     >
       <div className="flex items-start justify-between gap-2">

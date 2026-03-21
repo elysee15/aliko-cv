@@ -45,6 +45,7 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { AutosaveIndicator } from "@/components/autosave-indicator";
 import { SortableEntryEditor } from "./sortable-entry-editor";
 import { AddEntryDialog } from "./add-entry-dialog";
+import { SectionComments } from "./section-comments";
 
 type Entry = {
   id: string;
@@ -70,10 +71,11 @@ type Props = {
     visible: boolean;
     entries: Entry[];
   };
+  commentCount?: number;
   dragHandleProps?: Record<string, unknown>;
 };
 
-export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
+export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [optimisticEntryOrder, setOptimisticEntryOrder] = useState<
@@ -189,6 +191,11 @@ export function SectionEditor({ resumeId, section, dragHandleProps }: Props) {
         </div>
         <CardAction>
           <div className="flex items-center gap-1">
+            <SectionComments
+              sectionId={section.id}
+              resumeId={resumeId}
+              commentCount={commentCount}
+            />
             <Button
               variant="ghost"
               size="icon-xs"

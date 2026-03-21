@@ -98,7 +98,7 @@ export default async function PortfolioPage({
                   <Link
                     key={r.id}
                     href={`/cv/${r.slug}`}
-                    className="group rounded-xl border bg-background p-5 transition-shadow hover:shadow-md"
+                    className="group rounded-none border bg-background p-5 transition-shadow hover:shadow-md"
                   >
                     <div className="flex items-start justify-between">
                       <div>

@@ -98,7 +98,7 @@ export function TelegramLink({ botUsername }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {linked ? (
-          <div className="flex items-center justify-between rounded-lg border p-3">
+          <div className="flex items-center justify-between rounded-none border p-3">
             <div className="flex items-center gap-2">
               <Badge variant="default" className="bg-green-600">Lié</Badge>
               <span className="text-sm">
@@ -134,7 +134,7 @@ export function TelegramLink({ botUsername }: Props) {
             ) : (
               <div className="space-y-3">
                 {/* Step 1: open bot */}
-                <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                <div className="rounded-none border bg-muted/40 p-3 text-sm">
                   <p className="font-medium">Étape 1</p>
                   <p className="mt-1 text-muted-foreground">
                     Ouvrez le bot Telegram :{" "}
@@ -154,7 +154,7 @@ export function TelegramLink({ botUsername }: Props) {
                 </div>
 
                 {/* Step 2: send command */}
-                <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+                <div className="rounded-none border bg-muted/40 p-3 text-sm">
                   <p className="font-medium">Étape 2</p>
                   <p className="mt-1 text-muted-foreground">
                     Envoyez cette commande au bot :
@@ -189,7 +189,7 @@ export function TelegramLink({ botUsername }: Props) {
           <summary className="cursor-pointer font-medium">
             Commandes disponibles
           </summary>
-          <div className="mt-2 space-y-1 rounded-lg border bg-muted/40 p-3">
+          <div className="mt-2 space-y-1 rounded-none border bg-muted/40 p-3">
             <p><code>/list</code> — Lister vos CV</p>
             <p><code>/add &lt;id&gt; skill React</code> — Ajouter une compétence</p>
             <p><code>/add &lt;id&gt; experience Dev chez Google</code> — Ajouter une expérience</p>

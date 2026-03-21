@@ -90,7 +90,7 @@ export function PortfolioSettings({ enabled, slug, headline, bio }: Props) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-lg border p-3">
+        <div className="flex items-center justify-between rounded-none border p-3">
           <div>
             <p className="text-sm font-medium">
               {isEnabled ? "Portfolio activé" : "Portfolio désactivé"}

@@ -147,7 +147,7 @@ export function WebhookManager({ webhooks }: Props) {
 
       {/* Secret display (shown once after creation) */}
       {newSecret && (
-        <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-900/20">
+        <div className="space-y-2 rounded-none border border-amber-300 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-900/20">
           <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
             Secret de signature (affiché une seule fois) :
           </p>
@@ -168,7 +168,7 @@ export function WebhookManager({ webhooks }: Props) {
 
       {/* Creation form */}
       {showForm && (
-        <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+        <div className="space-y-3 rounded-none border bg-muted/30 p-3">
           <Field>
             <FieldLabel>URL (HTTPS)</FieldLabel>
             <Input
@@ -226,7 +226,7 @@ export function WebhookManager({ webhooks }: Props) {
           {webhooks.map((hook) => (
             <div
               key={hook.id}
-              className="flex items-center gap-3 rounded-lg border p-3"
+              className="flex items-center gap-3 rounded-none border p-3"
             >
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="truncate text-xs font-medium">{hook.url}</p>

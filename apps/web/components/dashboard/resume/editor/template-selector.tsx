@@ -58,7 +58,7 @@ export function TemplateSelector({ resumeId, currentTemplate }: Props) {
                 key={t}
                 type="button"
                 onClick={() => handleSelect(t)}
-                className={`relative rounded-lg border p-3 text-left transition-colors ${
+                className={`relative rounded-none border p-3 text-left transition-colors ${
                   isActive
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
                     : "hover:border-muted-foreground/30 hover:bg-muted/50"

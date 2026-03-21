@@ -152,7 +152,7 @@ export default async function HomePage() {
             <div className="grid gap-8 sm:grid-cols-3">
               {features.map((f) => (
                 <div key={f.title} className="space-y-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                  <div className="flex size-10 items-center justify-center rounded-none bg-primary/10">
                     <f.icon className="size-5 text-primary" />
                   </div>
                   <h3 className="font-medium">{f.title}</h3>
@@ -205,7 +205,7 @@ export default async function HomePage() {
               {faq.map((item) => (
                 <details
                   key={item.q}
-                  className="group rounded-lg border bg-background px-4 py-3"
+                  className="group rounded-none border bg-background px-4 py-3"
                 >
                   <summary className="cursor-pointer list-none font-medium [&::-webkit-details-marker]:hidden">
                     <span className="flex items-center justify-between">

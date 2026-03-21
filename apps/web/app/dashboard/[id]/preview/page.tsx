@@ -53,7 +53,7 @@ export default async function ResumePreviewPage({
         </div>
       </div>
 
-      <div className="rounded-xl border shadow-sm print:border-none print:shadow-none">
+      <div className="rounded-none border shadow-sm print:border-none print:shadow-none">
         <ResumePreview
           template={(resume.template ?? "classic") as TemplateType}
           resume={{

@@ -211,7 +211,7 @@ export function AtsAnalyzer({ resumeId }: Props) {
 
             {/* Tips */}
             {result.tips.length > 0 && (
-              <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
+              <div className="space-y-2 rounded-none border bg-muted/40 p-3">
                 <p className="flex items-center gap-1.5 text-sm font-medium">
                   <LightbulbIcon className="size-4 text-primary" />
                   Conseils

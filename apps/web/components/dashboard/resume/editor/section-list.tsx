@@ -76,9 +76,10 @@ type Section = {
 type Props = {
   resumeId: string;
   sections: Section[];
+  commentCounts?: Record<string, number>;
 };
 
-export function SectionList({ resumeId, sections }: Props) {
+export function SectionList({ resumeId, sections, commentCounts = {} }: Props) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedType, setSelectedType] = useState<SectionType>("experience");
@@ -218,7 +219,7 @@ export function SectionList({ resumeId, sections }: Props) {
       </div>
 
       {orderedSections.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-10 text-center">
+        <div className="rounded-none border border-dashed py-10 text-center">
           <p className="text-sm text-muted-foreground">
             Aucune section. Ajoutez Expérience, Formation, Compétences…
           </p>
@@ -239,6 +240,7 @@ export function SectionList({ resumeId, sections }: Props) {
                   key={section.id}
                   resumeId={resumeId}
                   section={section}
+                  commentCount={commentCounts[section.id] ?? 0}
                 />
               ))}
             </div>
