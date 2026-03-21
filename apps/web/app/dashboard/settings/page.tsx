@@ -11,6 +11,7 @@ import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
 import { ChangePasswordForm } from "@/components/dashboard/settings/change-password-form";
 import { ApiKeyManager } from "@/components/dashboard/settings/api-key-manager";
+import { DataManagement } from "@/components/dashboard/settings/data-management";
 
 export const metadata: Metadata = {
   title: "Paramètres",
@@ -45,6 +46,8 @@ export default async function SettingsPage() {
       <ChangePasswordForm />
 
       <ApiKeyManager keys={apiKeys} />
+
+      <DataManagement email={session.user.email} />
     </div>
   );
 }
