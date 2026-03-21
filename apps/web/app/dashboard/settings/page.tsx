@@ -11,6 +11,7 @@ import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
 import { ChangePasswordForm } from "@/components/dashboard/settings/change-password-form";
 import { ApiKeyManager } from "@/components/dashboard/settings/api-key-manager";
+import { TelegramLink } from "@/components/dashboard/settings/telegram-link";
 import { DataManagement } from "@/components/dashboard/settings/data-management";
 
 export const metadata: Metadata = {
@@ -46,6 +47,8 @@ export default async function SettingsPage() {
       <ChangePasswordForm />
 
       <ApiKeyManager keys={apiKeys} />
+
+      <TelegramLink />
 
       <DataManagement email={session.user.email} />
     </div>
