@@ -20,6 +20,10 @@ export type UpdateResumeParams = {
   title?: string;
   slug?: string;
   summary?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
   status?: "draft" | "published";
   template?: "classic" | "modern" | "minimal";
 };
@@ -265,6 +269,11 @@ export async function duplicateResume(
       title: `${source.title} (copie)`,
       slug: newSlug,
       summary: source.summary,
+      phone: source.phone,
+      website: source.website,
+      linkedin: source.linkedin,
+      github: source.github,
+      template: source.template,
       status: "draft",
     })
     .returning();

@@ -35,6 +35,10 @@ export const updateResumeSchema = z.object({
     .max(200, "Le titre ne doit pas dépasser 200 caractères")
     .optional(),
   summary: z.string().max(2000).nullable().optional(),
+  phone: z.string().max(30).nullable().optional(),
+  website: z.string().max(200).nullable().optional(),
+  linkedin: z.string().max(200).nullable().optional(),
+  github: z.string().max(200).nullable().optional(),
   status: z.enum(["draft", "published"]).optional(),
   template: z.enum(templateTypes).optional(),
 });

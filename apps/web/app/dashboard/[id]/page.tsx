@@ -71,6 +71,10 @@ export default async function ResumeEditorPage({
         id={resume.id}
         title={resume.title}
         summary={resume.summary}
+        phone={resume.phone}
+        website={resume.website}
+        linkedin={resume.linkedin}
+        github={resume.github}
         status={resume.status}
       />
 
@@ -91,6 +95,12 @@ export default async function ResumeEditorPage({
           user: {
             name: session.user.name,
             email: session.user.email,
+          },
+          contact: {
+            phone: resume.phone,
+            website: resume.website,
+            linkedin: resume.linkedin,
+            github: resume.github,
           },
         }}
       />

@@ -21,11 +21,19 @@ export type Section = {
   entries: Entry[];
 };
 
+export type ContactInfo = {
+  phone?: string | null;
+  website?: string | null;
+  linkedin?: string | null;
+  github?: string | null;
+};
+
 export type ResumeData = {
   title: string;
   summary: string | null;
   sections: Section[];
   user: { name: string; email: string };
+  contact?: ContactInfo;
 };
 
 export type TemplateProps = {
@@ -44,4 +52,9 @@ export function formatDate(dateStr: string | null): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
   return d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+}
+
+export function hasContactInfo(contact?: ContactInfo): boolean {
+  if (!contact) return false;
+  return !!(contact.phone || contact.website || contact.linkedin || contact.github);
 }

@@ -64,6 +64,12 @@ export default async function ResumePreviewPage({
               name: session.user.name,
               email: session.user.email,
             },
+            contact: {
+              phone: resume.phone,
+              website: resume.website,
+              linkedin: resume.linkedin,
+              github: resume.github,
+            },
           }}
         />
       </div>

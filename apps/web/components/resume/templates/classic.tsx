@@ -1,5 +1,24 @@
-import type { TemplateProps, Section } from "./types";
+import type { TemplateProps, Section, ContactInfo } from "./types";
 import { datedSections, formatDate } from "./types";
+
+function ContactLine({ email, contact }: { email: string; contact?: ContactInfo }) {
+  const items = [email];
+  if (contact?.phone) items.push(contact.phone);
+  if (contact?.website) items.push(contact.website);
+  if (contact?.linkedin) items.push(contact.linkedin);
+  if (contact?.github) items.push(contact.github);
+
+  return (
+    <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
+      {items.map((item, i) => (
+        <span key={i}>
+          {i > 0 && <span className="mr-2">·</span>}
+          {item}
+        </span>
+      ))}
+    </p>
+  );
+}
 
 function DateRange({
   startDate,
@@ -74,11 +93,11 @@ export function ClassicTemplate({ resume }: TemplateProps) {
 
   return (
     <div className="resume-preview mx-auto max-w-[210mm] space-y-6 bg-white p-8 text-[13px] leading-relaxed text-foreground print:p-0 print:shadow-none dark:bg-background">
-      <div className="space-y-1 text-center">
+      <div className="space-y-1.5 text-center">
         <h1 className="text-2xl font-bold tracking-tight">
           {resume.user.name}
         </h1>
-        <p className="text-sm text-muted-foreground">{resume.user.email}</p>
+        <ContactLine email={resume.user.email} contact={resume.contact} />
       </div>
 
       {resume.summary && (

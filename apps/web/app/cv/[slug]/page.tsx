@@ -62,6 +62,12 @@ export default async function PublicResumePage({
                 name: resume.user.name,
                 email: resume.user.email,
               },
+              contact: {
+                phone: resume.phone,
+                website: resume.website,
+                linkedin: resume.linkedin,
+                github: resume.github,
+              },
             }}
           />
         </div>

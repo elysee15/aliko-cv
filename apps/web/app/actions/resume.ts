@@ -84,6 +84,10 @@ export async function updateResumeAction(
   input: {
     title?: string;
     summary?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    linkedin?: string | null;
+    github?: string | null;
     status?: "draft" | "published";
     template?: "classic" | "modern" | "minimal";
   },
