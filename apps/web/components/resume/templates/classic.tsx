@@ -53,7 +53,7 @@ function TagSection({ section }: { section: Section }) {
         {visibleEntries.map((entry) => (
           <span
             key={entry.id}
-            className="rounded-md border px-2 py-0.5 text-xs"
+            className="border px-2 py-0.5 text-xs"
           >
             {entry.title}
             {entry.subtitle && (
