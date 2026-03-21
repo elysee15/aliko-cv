@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { SettingsIcon, SparklesIcon } from "lucide-react";
+import { MailIcon, SettingsIcon, SparklesIcon } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 import { SignOutButton } from "@/components/auth/sign-out-button";
@@ -37,6 +37,11 @@ export default async function DashboardLayout({
               {session.user.name || session.user.email}
             </span>
             <ThemeToggle />
+            <Link href="/dashboard/cover-letters">
+              <Button variant="ghost" size="icon-sm" title="Lettres de motivation">
+                <MailIcon />
+              </Button>
+            </Link>
             <Link href="/dashboard/settings">
               <Button variant="ghost" size="icon-sm" title="Paramètres">
                 <SettingsIcon />
