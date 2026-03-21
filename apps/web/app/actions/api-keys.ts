@@ -31,7 +31,7 @@ export async function createApiKeyAction(
 
     const { rawKey } = await createApiKey(db, user.id, name.trim());
 
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/integrations");
     return { success: true, data: { rawKey } };
   } catch {
     return { success: false, error: "Impossible de créer la clé API." };
@@ -46,7 +46,7 @@ export async function revokeApiKeyAction(
     const key = await revokeApiKey(db, id, user.id);
     if (!key) return { success: false, error: "Clé introuvable." };
 
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/integrations");
     return { success: true, data: key };
   } catch {
     return { success: false, error: "Impossible de révoquer la clé API." };

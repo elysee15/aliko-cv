@@ -49,7 +49,7 @@ export async function unlinkTelegramAction(): Promise<ActionResult> {
   try {
     const user = await requireUser();
     await unlinkTelegram(db, user.id);
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/integrations");
     return { success: true, data: null };
   } catch {
     return { success: false, error: "Impossible de délier le compte Telegram." };
