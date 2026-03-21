@@ -83,6 +83,7 @@ export async function updateResumeAction(
   id: string,
   input: {
     title?: string;
+    slug?: string;
     summary?: string | null;
     phone?: string | null;
     website?: string | null;

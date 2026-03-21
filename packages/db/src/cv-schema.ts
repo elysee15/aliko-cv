@@ -35,13 +35,6 @@ export const resumeTemplateEnum = pgEnum("resume_template", [
   "minimal",
 ]);
 
-export const skillLevelEnum = pgEnum("skill_level", [
-  "beginner",
-  "intermediate",
-  "advanced",
-  "expert",
-]);
-
 // ---------------------------------------------------------------------------
 // Resume — the top-level CV entity
 // ---------------------------------------------------------------------------
