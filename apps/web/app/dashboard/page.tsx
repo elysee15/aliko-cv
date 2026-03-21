@@ -8,6 +8,7 @@ import { getResumesByUser } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
 import { CreateResumeDialog } from "@/components/dashboard/resume/create-resume-dialog";
+import { ImportLinkedInDialog } from "@/components/dashboard/resume/import-linkedin-dialog";
 import { ResumeList } from "@/components/dashboard/resume/resume-list";
 
 export const metadata: Metadata = {
@@ -36,7 +37,10 @@ export default async function DashboardPage() {
               : `${resumes.length} CV`}
           </p>
         </div>
-        <CreateResumeDialog />
+        <div className="flex items-center gap-2">
+          <ImportLinkedInDialog />
+          <CreateResumeDialog />
+        </div>
       </div>
 
       {resumes.length === 0 ? (
@@ -44,7 +48,7 @@ export default async function DashboardPage() {
           <FileTextIcon className="mb-3 size-10 text-muted-foreground/50" />
           <p className="text-sm font-medium">Aucun CV pour le moment</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Cliquez sur &quot;Nouveau CV&quot; pour commencer.
+            Créez un CV vide ou importez depuis LinkedIn.
           </p>
         </div>
       ) : (
