@@ -57,7 +57,13 @@ export function MinimalTemplate({ resume }: TemplateProps) {
         <h1 className="text-3xl font-light tracking-tight">
           {resume.user.name}
         </h1>
-        <p className="text-sm text-muted-foreground">{resume.user.email}</p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+          <span>{resume.user.email}</span>
+          {resume.contact?.phone && <span>{resume.contact.phone}</span>}
+          {resume.contact?.website && <span>{resume.contact.website}</span>}
+          {resume.contact?.linkedin && <span>{resume.contact.linkedin}</span>}
+          {resume.contact?.github && <span>{resume.contact.github}</span>}
+        </div>
       </div>
 
       {resume.summary && (

@@ -81,9 +81,21 @@ export function ModernTemplate({ resume }: TemplateProps) {
         <h1 className="font-heading text-3xl font-bold tracking-tight">
           {resume.user.name}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {resume.user.email}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+          <span>{resume.user.email}</span>
+          {resume.contact?.phone && (
+            <span>· {resume.contact.phone}</span>
+          )}
+          {resume.contact?.website && (
+            <span>· {resume.contact.website}</span>
+          )}
+          {resume.contact?.linkedin && (
+            <span>· {resume.contact.linkedin}</span>
+          )}
+          {resume.contact?.github && (
+            <span>· {resume.contact.github}</span>
+          )}
+        </div>
         {resume.summary && (
           <p className="mt-3 text-sm leading-relaxed">{resume.summary}</p>
         )}
