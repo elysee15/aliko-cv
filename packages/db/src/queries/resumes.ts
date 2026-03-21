@@ -89,6 +89,23 @@ export async function getResumesByUser(db: Database, userId: string) {
   });
 }
 
+export async function getFullResumesByUser(db: Database, userId: string) {
+  return db.query.resume.findMany({
+    where: eq(resume.userId, userId),
+    orderBy: desc(resume.updatedAt),
+    with: {
+      sections: {
+        orderBy: asc(resumeSection.sortOrder),
+        with: {
+          entries: {
+            orderBy: asc(resumeEntry.sortOrder),
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function getResumeById(
   db: Database,
   id: string,

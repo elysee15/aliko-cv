@@ -228,7 +228,12 @@ export default async function HomePage() {
       <footer className="border-t px-4 py-6">
         <div className="mx-auto flex max-w-5xl items-center justify-between text-xs text-muted-foreground">
           <span>&copy; {new Date().getFullYear()} Aliko</span>
-          <span>Construit avec Next.js &amp; Drizzle</span>
+          <div className="flex items-center gap-3">
+            <Link href="/privacy" className="hover:underline">
+              Confidentialité
+            </Link>
+            <span>Construit avec Next.js &amp; Drizzle</span>
+          </div>
         </div>
       </footer>
     </div>
