@@ -17,6 +17,13 @@ import { toast } from "sonner";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Badge } from "@workspace/ui/components/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@workspace/ui/components/card";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 
 import {
@@ -109,32 +116,34 @@ export function WebhookManager({ webhooks }: Props) {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <WebhookIcon className="size-4 text-primary" />
-          <h2 className="text-sm font-semibold">Webhooks</h2>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <WebhookIcon className="size-4" />
+            Webhooks
+          </CardTitle>
+          {!showForm && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowForm(true);
+                setNewSecret(null);
+              }}
+              disabled={webhooks.length >= 5}
+            >
+              <PlusIcon />
+              Ajouter
+            </Button>
+          )}
         </div>
-        {!showForm && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setShowForm(true);
-              setNewSecret(null);
-            }}
-            disabled={webhooks.length >= 5}
-          >
-            <PlusIcon />
-            Ajouter
-          </Button>
-        )}
-      </div>
-
-      <p className="text-xs text-muted-foreground">
-        Recevez des notifications HTTP lorsque vos CV changent. Idéal pour
-        n8n, Make, Zapier ou votre propre backend.
-      </p>
+        <CardDescription>
+          Recevez des notifications HTTP lorsque vos CV changent. Idéal pour
+          n8n, Make, Zapier ou votre propre backend.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
 
       {/* Secret display (shown once after creation) */}
       {newSecret && (
@@ -271,6 +280,7 @@ export function WebhookManager({ webhooks }: Props) {
           Aucun webhook configuré.
         </p>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

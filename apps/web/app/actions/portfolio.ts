@@ -25,7 +25,7 @@ export async function updatePortfolioAction(
   try {
     const user = await requireUser();
     const portfolio = await upsertPortfolio(db, user.id, input);
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/portfolio");
     return { success: true, data: portfolio };
   } catch {
     return { success: false, error: "Impossible de mettre à jour le portfolio." };

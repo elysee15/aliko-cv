@@ -80,7 +80,7 @@ export async function createWebhookAction(input: {
       events,
     });
 
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/integrations");
     return { success: true, data: { id: hook.id, secret } };
   } catch {
     return { success: false, error: "Erreur lors de la création." };
@@ -95,7 +95,7 @@ export async function deleteWebhookAction(
     const hook = await deleteWebhook(db, id, user.id);
     if (!hook) return { success: false, error: "Webhook introuvable." };
 
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/integrations");
     return { success: true, data: { id: hook.id } };
   } catch {
     return { success: false, error: "Erreur lors de la suppression." };
@@ -111,7 +111,7 @@ export async function toggleWebhookAction(
     const hook = await toggleWebhook(db, id, user.id, active);
     if (!hook) return { success: false, error: "Webhook introuvable." };
 
-    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard/settings/integrations");
     return { success: true, data: { id: hook.id } };
   } catch {
     return { success: false, error: "Erreur lors de la mise à jour." };
