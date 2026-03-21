@@ -53,7 +53,7 @@ export function ResumeList({ resumes }: { resumes: Resume[] }) {
             className="pl-8"
           />
         </div>
-        <div className="flex shrink-0 gap-1 rounded-lg border p-0.5">
+        <div className="flex shrink-0 gap-1 rounded-none border p-0.5">
           {filters.map((f) => (
             <Button
               key={f.value}
@@ -73,7 +73,7 @@ export function ResumeList({ resumes }: { resumes: Resume[] }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-none border border-dashed py-16 text-center">
           <FileTextIcon className="mb-3 size-10 text-muted-foreground/50" />
           <p className="text-sm font-medium">Aucun résultat</p>
           <p className="mt-1 text-sm text-muted-foreground">

@@ -176,7 +176,7 @@ export function ResumeHeaderEditor({
             </FieldDescription>
           </Field>
 
-          <div className="space-y-3 rounded-lg border p-3">
+          <div className="space-y-3 rounded-none border p-3">
             <p className="text-sm font-medium">Coordonnées</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field>

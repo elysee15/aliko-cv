@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 
 import { db } from "@aliko-cv/db/client";
-import { getResumeById } from "@aliko-cv/db/queries";
+import { getResumeById, getCommentCountsBySections } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
 import { Button } from "@workspace/ui/components/button";
@@ -40,6 +40,12 @@ export default async function ResumeEditorPage({
   if (!resume) notFound();
 
   const template = (resume.template ?? "classic") as TemplateType;
+
+  const commentCounts = await getCommentCountsBySections(
+    db,
+    resume.sections.map((s) => s.id),
+    session.user.id,
+  );
 
   const toolbar = (
     <div className="flex items-center gap-3 border-b px-4 py-3">
@@ -85,12 +91,16 @@ export default async function ResumeEditorPage({
 
       <TemplateSelector resumeId={resume.id} currentTemplate={template} />
 
-      <SectionList resumeId={resume.id} sections={resume.sections} />
+      <SectionList
+        resumeId={resume.id}
+        sections={resume.sections}
+        commentCounts={commentCounts}
+      />
     </div>
   );
 
   const previewPane = (
-    <div className="rounded-xl border shadow-sm print:border-none print:shadow-none">
+    <div className="rounded-none border shadow-sm print:border-none print:shadow-none">
       <ResumePreview
         template={template}
         resume={{

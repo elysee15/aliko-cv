@@ -108,7 +108,7 @@ export function ImportLinkedInDialog() {
 
         <div className="space-y-4">
           {/* Instructions */}
-          <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+          <div className="rounded-none border bg-muted/40 p-3 text-sm">
             <p className="font-medium">Comment obtenir le fichier ?</p>
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-muted-foreground">
               <li>
@@ -130,7 +130,7 @@ export function ImportLinkedInDialog() {
 
           {/* Drop zone */}
           <div
-            className={`relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition-colors ${
+            className={`relative flex flex-col items-center justify-center rounded-none border-2 border-dashed p-8 transition-colors ${
               dragOver
                 ? "border-primary bg-primary/5"
                 : file

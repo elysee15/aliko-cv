@@ -44,7 +44,7 @@ export default async function DashboardPage() {
       </div>
 
       {resumes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-none border border-dashed py-16 text-center">
           <FileTextIcon className="mb-3 size-10 text-muted-foreground/50" />
           <p className="text-sm font-medium">Aucun CV pour le moment</p>
           <p className="mt-1 text-sm text-muted-foreground">

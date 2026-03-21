@@ -30,9 +30,10 @@ type Props = {
     visible: boolean;
     entries: Entry[];
   };
+  commentCount?: number;
 };
 
-export function SortableSectionEditor({ resumeId, section }: Props) {
+export function SortableSectionEditor({ resumeId, section, commentCount = 0 }: Props) {
   const {
     attributes,
     listeners,
@@ -55,6 +56,7 @@ export function SortableSectionEditor({ resumeId, section }: Props) {
       <SectionEditor
         resumeId={resumeId}
         section={section}
+        commentCount={commentCount}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>

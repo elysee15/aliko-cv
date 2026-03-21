@@ -92,7 +92,7 @@ export function ApiKeyManager({ keys }: Props) {
       <CardContent className="space-y-4">
         {/* Revealed key banner */}
         {revealedKey && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-50 p-3 dark:bg-amber-950/20">
+          <div className="rounded-none border border-amber-500/30 bg-amber-50 p-3 dark:bg-amber-950/20">
             <p className="mb-2 text-sm font-medium text-amber-800 dark:text-amber-200">
               Copiez cette clé maintenant — elle ne sera plus affichée.
             </p>
@@ -113,7 +113,7 @@ export function ApiKeyManager({ keys }: Props) {
 
         {/* Existing keys */}
         {keys.length > 0 ? (
-          <div className="divide-y rounded-lg border">
+          <div className="divide-y rounded-none border">
             {keys.map((k) => (
               <div
                 key={k.id}
@@ -172,7 +172,7 @@ export function ApiKeyManager({ keys }: Props) {
           <summary className="cursor-pointer font-medium">
             Comment utiliser l&apos;API ?
           </summary>
-          <div className="mt-2 space-y-2 rounded-lg border bg-muted/40 p-3">
+          <div className="mt-2 space-y-2 rounded-none border bg-muted/40 p-3">
             <p>Listez vos CV :</p>
             <pre className="overflow-x-auto rounded bg-background p-2 text-[11px]">
 {`curl -H "Authorization: Bearer ak_votre_cle" \\

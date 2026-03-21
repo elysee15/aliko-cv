@@ -78,7 +78,7 @@ export function DataManagement({ email }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Export */}
-        <div className="flex items-center justify-between rounded-lg border p-3">
+        <div className="flex items-center justify-between rounded-none border p-3">
           <div>
             <p className="text-sm font-medium">Exporter mes données</p>
             <p className="text-xs text-muted-foreground">
@@ -92,7 +92,7 @@ export function DataManagement({ email }: Props) {
         </div>
 
         {/* Delete account */}
-        <div className="flex items-center justify-between rounded-lg border border-destructive/30 p-3">
+        <div className="flex items-center justify-between rounded-none border border-destructive/30 p-3">
           <div>
             <p className="text-sm font-medium text-destructive">Supprimer mon compte</p>
             <p className="text-xs text-muted-foreground">

@@ -142,7 +142,7 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
   if (!expanded) {
     return (
       <div
-        className={`flex items-center gap-1 rounded-lg border px-2 py-2 ${isPending ? "opacity-50" : ""}`}
+        className={`flex items-center gap-1 rounded-none border px-2 py-2 ${isPending ? "opacity-50" : ""}`}
       >
         {dragHandleProps && (
           <button
@@ -186,7 +186,7 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
   if (isTag) {
     return (
       <div
-        className={`space-y-3 rounded-lg border p-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
+        className={`space-y-3 rounded-none border p-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
       >
         <div className="flex items-center justify-between">
           <button
@@ -236,7 +236,7 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
 
   return (
     <div
-      className={`space-y-3 rounded-lg border p-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
+      className={`space-y-3 rounded-none border p-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
     >
       <div className="flex items-center justify-between">
         <button

@@ -1,6 +1,6 @@
 function CardSkeleton() {
   return (
-    <div className="rounded-xl border p-4 space-y-3">
+    <div className="rounded-none border p-4 space-y-3">
       <div className="flex items-center gap-2">
         <div className="size-4 rounded bg-muted animate-pulse" />
         <div className="h-4 w-32 rounded bg-muted animate-pulse" />
