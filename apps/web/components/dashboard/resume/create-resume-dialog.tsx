@@ -22,17 +22,21 @@ import { Label } from "@workspace/ui/components/label";
 
 import { createResumeAction } from "@/app/actions/resume";
 import { extractActionError } from "@/lib/action-error";
+import { type TemplateType } from "@/lib/schemas/resume";
+import { TemplatePicker } from "./template-picker";
 
 export function CreateResumeDialog() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>("classic");
   const router = useRouter();
 
-  const { execute, isExecuting, result } = useAction(createResumeAction, {
+  const { execute, isExecuting, result, reset } = useAction(createResumeAction, {
     onSuccess: ({ data }) => {
       if (data) {
         toast.success("CV créé !");
         setTitle("");
+        setSelectedTemplate("classic");
         setOpen(false);
         router.push(`/dashboard/${data.id}`);
       }
@@ -42,8 +46,17 @@ export function CreateResumeDialog() {
 
   const titleError = result.validationErrors?.title?._errors?.[0];
 
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setTitle("");
+      setSelectedTemplate("classic");
+      reset();
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button size="sm">
@@ -52,31 +65,42 @@ export function CreateResumeDialog() {
           </Button>
         }
       />
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Créer un CV</DialogTitle>
           <DialogDescription>
-            Donnez un titre à votre nouveau CV pour commencer.
+            Donnez un titre et choisissez un template pour commencer.
           </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            execute({ title });
+            execute({ title, template: selectedTemplate });
           }}
         >
-          <Field data-invalid={!!titleError}>
-            <FieldLabel>
-              <Label>Titre</Label>
-            </FieldLabel>
-            <Input
-              placeholder="Mon CV 2026"
-              autoFocus
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            {titleError && <FieldError errors={[{ message: titleError }]} />}
-          </Field>
+          <div className="space-y-4">
+            <Field data-invalid={!!titleError}>
+              <FieldLabel>
+                <Label>Titre</Label>
+              </FieldLabel>
+              <Input
+                placeholder="Mon CV 2026"
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              {titleError && <FieldError errors={[{ message: titleError }]} />}
+            </Field>
+
+            <div className="space-y-2">
+              <Label>Template</Label>
+              <TemplatePicker
+                value={selectedTemplate}
+                onValueChange={setSelectedTemplate}
+              />
+            </div>
+          </div>
+
           <DialogFooter className="mt-4">
             <Button type="submit" disabled={isExecuting}>
               {isExecuting ? "Création…" : "Créer"}
