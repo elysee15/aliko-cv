@@ -40,18 +40,26 @@ export async function POST(
     );
   }
 
-  const section = await createSection(db, auth.userId, {
-    resumeId,
-    type: parsed.data.type,
-    title: parsed.data.title,
-    source: "api",
-  });
+  try {
+    const section = await createSection(db, auth.userId, {
+      resumeId,
+      type: parsed.data.type,
+      title: parsed.data.title,
+      source: "api",
+    });
 
-  if (!section) {
-    return NextResponse.json({ error: "Resume not found" }, { status: 404 });
+    if (!section) {
+      return NextResponse.json({ error: "Resume not found" }, { status: 404 });
+    }
+
+    dispatchWebhook(auth.userId, "resume.updated", { resumeId });
+
+    return NextResponse.json({ data: section }, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/v1/resumes/[id]/sections error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
-
-  dispatchWebhook(auth.userId, "resume.updated", { resumeId });
-
-  return NextResponse.json({ data: section }, { status: 201 });
 }

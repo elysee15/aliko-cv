@@ -348,6 +348,46 @@ async function isEntryOwner(
 }
 
 // ---------------------------------------------------------------------------
+// Ancestor lookups (for REST API URL param validation)
+// ---------------------------------------------------------------------------
+
+export async function getSectionWithResume(
+  db: Database,
+  sectionId: string,
+  userId: string,
+) {
+  const [row] = await db
+    .select({
+      id: resumeSection.id,
+      resumeId: resumeSection.resumeId,
+    })
+    .from(resumeSection)
+    .innerJoin(resume, eq(resumeSection.resumeId, resume.id))
+    .where(and(eq(resumeSection.id, sectionId), eq(resume.userId, userId)))
+    .limit(1);
+  return row;
+}
+
+export async function getEntryWithAncestors(
+  db: Database,
+  entryId: string,
+  userId: string,
+) {
+  const [row] = await db
+    .select({
+      id: resumeEntry.id,
+      sectionId: resumeEntry.sectionId,
+      resumeId: resumeSection.resumeId,
+    })
+    .from(resumeEntry)
+    .innerJoin(resumeSection, eq(resumeEntry.sectionId, resumeSection.id))
+    .innerJoin(resume, eq(resumeSection.resumeId, resume.id))
+    .where(and(eq(resumeEntry.id, entryId), eq(resume.userId, userId)))
+    .limit(1);
+  return row;
+}
+
+// ---------------------------------------------------------------------------
 // Section CRUD
 // ---------------------------------------------------------------------------
 

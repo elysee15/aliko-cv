@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@aliko-cv/db/client";
-import { updateEntry } from "@aliko-cv/db/queries";
+import { updateEntry, getEntryWithAncestors } from "@aliko-cv/db/queries";
 import { authenticateApiKeyWrite } from "@/lib/api-auth";
 import { dispatchWebhook } from "@/lib/webhooks";
 
@@ -29,7 +29,7 @@ export async function PATCH(
   const auth = await authenticateApiKeyWrite(request);
   if (auth instanceof NextResponse) return auth;
 
-  const { id: resumeId, entryId } = await params;
+  const { id: resumeId, sectionId, entryId } = await params;
 
   let body: unknown;
   try {
@@ -53,19 +53,41 @@ export async function PATCH(
     );
   }
 
-  const updated = await updateEntry(db, auth.userId, {
-    id: entryId,
-    ...parsed.data,
-  });
+  try {
+    const ancestors = await getEntryWithAncestors(db, entryId, auth.userId);
+    if (!ancestors) {
+      return NextResponse.json(
+        { error: "Entry not found or access denied" },
+        { status: 404 },
+      );
+    }
+    if (ancestors.sectionId !== sectionId || ancestors.resumeId !== resumeId) {
+      return NextResponse.json(
+        { error: "Entry does not belong to the specified section/resume" },
+        { status: 400 },
+      );
+    }
 
-  if (!updated) {
+    const updated = await updateEntry(db, auth.userId, {
+      id: entryId,
+      ...parsed.data,
+    });
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Entry not found or access denied" },
+        { status: 404 },
+      );
+    }
+
+    dispatchWebhook(auth.userId, "resume.updated", { resumeId });
+
+    return NextResponse.json({ data: updated });
+  } catch (err) {
+    console.error("PATCH /api/v1/.../entries/[entryId] error:", err);
     return NextResponse.json(
-      { error: "Entry not found or access denied" },
-      { status: 404 },
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
-
-  dispatchWebhook(auth.userId, "resume.updated", { resumeId });
-
-  return NextResponse.json({ data: updated });
 }
