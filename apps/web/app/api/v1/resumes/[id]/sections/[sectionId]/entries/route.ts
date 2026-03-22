@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@aliko-cv/db/client";
-import { createEntry } from "@aliko-cv/db/queries";
+import { createEntry, getSectionWithResume } from "@aliko-cv/db/queries";
 import { authenticateApiKeyWrite } from "@/lib/api-auth";
 import { dispatchWebhook } from "@/lib/webhooks";
 
@@ -45,20 +45,42 @@ export async function POST(
     );
   }
 
-  const entry = await createEntry(db, auth.userId, {
-    sectionId,
-    ...parsed.data,
-    source: "api",
-  });
+  try {
+    const section = await getSectionWithResume(db, sectionId, auth.userId);
+    if (!section) {
+      return NextResponse.json(
+        { error: "Section not found or access denied" },
+        { status: 404 },
+      );
+    }
+    if (section.resumeId !== resumeId) {
+      return NextResponse.json(
+        { error: "Section does not belong to this resume" },
+        { status: 400 },
+      );
+    }
 
-  if (!entry) {
+    const entry = await createEntry(db, auth.userId, {
+      sectionId,
+      ...parsed.data,
+      source: "api",
+    });
+
+    if (!entry) {
+      return NextResponse.json(
+        { error: "Failed to create entry" },
+        { status: 500 },
+      );
+    }
+
+    dispatchWebhook(auth.userId, "resume.updated", { resumeId });
+
+    return NextResponse.json({ data: entry }, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/v1/.../entries error:", err);
     return NextResponse.json(
-      { error: "Section not found or access denied" },
-      { status: 404 },
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
-
-  dispatchWebhook(auth.userId, "resume.updated", { resumeId });
-
-  return NextResponse.json({ data: entry }, { status: 201 });
 }

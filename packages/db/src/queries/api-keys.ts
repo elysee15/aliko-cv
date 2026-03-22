@@ -102,13 +102,19 @@ export async function validateApiKey(
   rawKey: string,
 ): Promise<{ userId: string; scope: "read" | "read_write" } | null> {
   const keyHash = await sha256(rawKey);
-  const row = await db.query.apiKey.findFirst({
-    where: and(eq(apiKey.keyHash, keyHash), isNull(apiKey.revokedAt)),
-  });
+  const [row] = await db
+    .select({
+      id: apiKey.id,
+      userId: apiKey.userId,
+      scope: apiKey.scope,
+    })
+    .from(apiKey)
+    .where(and(eq(apiKey.keyHash, keyHash), isNull(apiKey.revokedAt)))
+    .limit(1);
 
   if (!row) return null;
 
-  await db
+  void db
     .update(apiKey)
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKey.id, row.id));

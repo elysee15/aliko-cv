@@ -57,6 +57,16 @@ export default async function DashboardLayout({
         </div>
       </header>
       <main className="p-4 print:p-0">{children}</main>
+      <footer className="border-t px-4 py-3 print:hidden">
+        <div className="mx-auto flex max-w-5xl items-center justify-center">
+          <Link
+            href="/privacy"
+            className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Confidentialité
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

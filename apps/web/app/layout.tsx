@@ -4,6 +4,7 @@ import "@workspace/ui/globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@workspace/ui/lib/utils";
 import { Toaster } from "@/components/toaster";
+import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 
 const fontSans = Manrope({
   subsets: ["latin"],
@@ -30,6 +31,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <Toaster />
+          <CookieConsentBanner />
         </ThemeProvider>
       </body>
     </html>
