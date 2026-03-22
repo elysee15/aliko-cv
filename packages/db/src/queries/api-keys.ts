@@ -1,6 +1,6 @@
 import { and, eq, isNull, desc } from "drizzle-orm";
 
-import type { Database } from "../client";
+import type { Database, DatabaseOrTransaction } from "../client";
 import { apiKey } from "../apikey-schema";
 
 // ---------------------------------------------------------------------------
@@ -31,10 +31,10 @@ function generateRawKey(): string {
 // ---------------------------------------------------------------------------
 
 export async function createApiKey(
-  db: Database,
+  db: DatabaseOrTransaction,
   userId: string,
   name: string,
-): Promise<{ key: typeof apiKey.$inferSelect; rawKey: string }> {
+) {
   const rawKey = generateRawKey();
   const keyHash = await sha256(rawKey);
   const keyPrefix = rawKey.slice(0, 11);
@@ -42,14 +42,25 @@ export async function createApiKey(
   const [row] = await db
     .insert(apiKey)
     .values({ userId, name, keyHash, keyPrefix })
-    .returning();
+    .returning({
+      id: apiKey.id,
+      name: apiKey.name,
+      keyPrefix: apiKey.keyPrefix,
+      createdAt: apiKey.createdAt,
+    });
 
   return { key: row!, rawKey };
 }
 
-export async function getApiKeysByUser(db: Database, userId: string) {
+export async function getApiKeysByUser(db: DatabaseOrTransaction, userId: string) {
   return db
-    .select()
+    .select({
+      id: apiKey.id,
+      name: apiKey.name,
+      keyPrefix: apiKey.keyPrefix,
+      lastUsedAt: apiKey.lastUsedAt,
+      createdAt: apiKey.createdAt,
+    })
     .from(apiKey)
     .where(and(eq(apiKey.userId, userId), isNull(apiKey.revokedAt)))
     .orderBy(desc(apiKey.createdAt));
@@ -64,7 +75,12 @@ export async function revokeApiKey(
     .update(apiKey)
     .set({ revokedAt: new Date() })
     .where(and(eq(apiKey.id, id), eq(apiKey.userId, userId)))
-    .returning();
+    .returning({
+      id: apiKey.id,
+      name: apiKey.name,
+      keyPrefix: apiKey.keyPrefix,
+      revokedAt: apiKey.revokedAt,
+    });
   return row;
 }
 

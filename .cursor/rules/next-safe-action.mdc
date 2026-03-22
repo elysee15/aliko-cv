@@ -1,0 +1,630 @@
+---
+description: Server action conventions using next-safe-action. Apply when creating, editing, or reviewing files in app/actions/ or any "use server" action file.
+globs: apps/web/app/actions/**/*.ts, apps/web/lib/safe-action*.ts
+alwaysApply: false
+---
+# next-safe-action Conventions
+
+All server actions MUST use `next-safe-action` instead of raw `"use server"` functions. This ensures type-safe, validated, structured results with consistent error handling.
+
+## Dependencies
+
+```bash
+# Core (already installed or install once)
+bun add next-safe-action zod
+
+# When a form needs react-hook-form integration
+bun add react-hook-form @hookform/resolvers @next-safe-action/adapter-react-hook-form
+```
+
+## 1. Action Client Setup (`apps/web/lib/safe-action.ts`)
+
+Create a client hierarchy — base, authenticated, admin:
+
+```ts
+import { createSafeActionClient } from "next-safe-action";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
+
+export const actionClient = createSafeActionClient({
+  handleServerError(e) {
+    console.error("Action error:", e.message);
+    return e.message;
+  },
+});
+
+export const authClient = actionClient.use(async ({ next }) => {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new Error("Non autorisé");
+  return next({ ctx: { user: session.user, session } });
+});
+```
+
+- `actionClient` — public actions (no auth required)
+- `authClient` — requires valid session, injects `ctx.user` and `ctx.session`
+- Add more specialized clients as needed (e.g. `adminClient`)
+
+### Better Auth integration details
+
+This project uses **Better Auth** (`@aliko-cv/auth`). The `auth` object is created via `initAuth()` in `apps/web/lib/auth.ts` and exposes `auth.api.*` server-side methods.
+
+**How session retrieval works in middleware:**
+
+- `auth.api.getSession({ headers: await headers() })` reads the session cookie from the incoming request headers. `headers()` is async in Next.js 15+.
+- Returns `{ session, user }` or `null` if unauthenticated.
+- `user` contains at minimum: `id`, `email`, `name`, `image`, `emailVerified`, `createdAt`, `updatedAt`.
+- `session` contains: `id`, `userId`, `token`, `expiresAt`, `ipAddress`, `userAgent`.
+
+**Do NOT** use `auth.api.getSession()` inside individual actions — it belongs in the `authClient` middleware so every authenticated action gets `ctx.user` automatically.
+
+```ts
+// BAD: Calling getSession inside every action
+export const myAction = actionClient
+  .inputSchema(schema)
+  .action(async ({ parsedInput }) => {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) throw new Error("Non autorisé");
+    // ...
+  });
+
+// GOOD: Use authClient — session check is in the middleware
+export const myAction = authClient
+  .inputSchema(schema)
+  .action(async ({ parsedInput, ctx }) => {
+    // ctx.user is already verified and typed
+    const userId = ctx.user.id;
+    // ...
+  });
+```
+
+**Email-verified guard** — extend `authClient` when actions require a verified email:
+
+```ts
+export const verifiedClient = authClient.use(async ({ next, ctx }) => {
+  if (!ctx.user.emailVerified) throw new Error("E-mail non vérifié");
+  return next();
+});
+```
+
+## 2. Defining Actions
+
+Every action file MUST have `"use server"` at the top. Use the chainable API:
+
+```ts
+"use server";
+
+import { z } from "zod";
+import { authClient } from "@/lib/safe-action";
+import { db } from "@aliko-cv/db/client";
+import { createResume } from "@aliko-cv/db/queries";
+import { revalidatePath } from "next/cache";
+
+export const createResumeAction = authClient
+  .inputSchema(z.object({ title: z.string().min(1) }))
+  .action(async ({ parsedInput, ctx }) => {
+    const resume = await createResume(db, {
+      userId: ctx.user.id,
+      title: parsedInput.title,
+      slug: `${slugify(parsedInput.title)}-${Date.now().toString(36)}`,
+    });
+    revalidatePath("/dashboard");
+    return resume;
+  });
+```
+
+### Chain order
+
+```
+authClient
+  .use(actionLevelMiddleware)   // optional per-action middleware
+  .metadata({ ... })            // if defineMetadataSchema is set
+  .inputSchema(zodSchema)       // required — validates input
+  .outputSchema(zodSchema)      // optional — validates return value
+  .action(async ({ parsedInput, ctx }) => { ... })
+```
+
+### Key rules
+
+- Define Zod schemas inline or import from `@/lib/schemas/*`
+- Access the authenticated user via `ctx.user` (from `authClient`)
+- Call query functions from `@aliko-cv/db/queries` — never inline SQL
+- Call `revalidatePath()` after mutations
+- Return data directly — do NOT wrap in `{ success, data, error }` envelopes; next-safe-action structures the result automatically
+
+### i18n — localized validation messages
+
+Pass an **async function** to `.inputSchema()` instead of a schema directly. It runs on every call, so it always uses the current locale:
+
+```ts
+import { getTranslations } from "next-intl/server";
+
+export const createUserAction = authClient
+  .inputSchema(async () => {
+    const t = await getTranslations("validation");
+    return z.object({
+      name: z.string().min(2, t("name.tooShort")),
+      email: z.string().email(t("email.invalid")),
+    });
+  })
+  .action(async ({ parsedInput }) => { /* ... */ });
+```
+
+Works with any server-side i18n library (`next-intl`, `i18next`, custom). The async factory can also extend a previous schema via `prevSchema`:
+
+```ts
+.inputSchema(async (prevSchema) => {
+  const t = await getTranslations("validation");
+  return prevSchema.extend({
+    teamName: z.string().min(3, t("teamName.tooShort")),
+  });
+})
+```
+
+### Output validation
+
+Chain `.outputSchema()` before `.action()` to validate the return value at runtime. Useful for API-like actions where the contract must be strict:
+
+```ts
+const outputSchema = z.object({ id: z.string(), name: z.string() });
+
+export const getUserAction = authClient
+  .inputSchema(z.object({ userId: z.string() }))
+  .outputSchema(outputSchema)
+  .action(async ({ parsedInput }) => {
+    const user = await getUserById(db, parsedInput.userId);
+    return { id: user.id, name: user.name };
+  });
+```
+
+If the return value doesn't match, the action fails with a `serverError` (not `validationErrors`). Log it via `handleServerError`:
+
+```ts
+createSafeActionClient({
+  handleServerError(e) {
+    if (e.constructor.name === "ActionOutputDataValidationError") {
+      console.error("Output validation failed:", e.message);
+    }
+    return "Something went wrong";
+  },
+});
+```
+
+For internal UI actions, TypeScript inference is usually sufficient — `.outputSchema()` is optional.
+
+## 3. Validation Errors & Utilities
+
+### returnValidationErrors
+
+Use for business-logic validation (e.g. "email already taken"). **Never returns** — throws internally:
+
+```ts
+import { returnValidationErrors } from "next-safe-action";
+
+export const signUpAction = actionClient
+  .inputSchema(signUpSchema)
+  .action(async ({ parsedInput }) => {
+    const exists = await findUserByEmail(db, parsedInput.email);
+    if (exists) {
+      returnValidationErrors(signUpSchema, {
+        email: { _errors: ["Cet e-mail est déjà utilisé"] },
+      });
+    }
+
+    // Form-level errors (not tied to a field)
+    returnValidationErrors(signUpSchema, {
+      _errors: ["Les inscriptions sont désactivées"],
+    });
+  });
+```
+
+Accepts both direct schemas and async factory functions (for i18n).
+
+### Error shapes — formatted vs flattened
+
+**Formatted (default)** — mirrors schema structure with `_errors` arrays:
+
+```ts
+{ name: { _errors: ["Trop court"] }, email: { _errors: ["E-mail invalide"] } }
+```
+
+**Flattened** — flat `formErrors` + `fieldErrors` (discards nested fields):
+
+```ts
+{ formErrors: ["Erreur globale"], fieldErrors: { name: ["Trop court"] } }
+```
+
+Set the default shape on the client or override per action:
+
+```ts
+// Client-level default
+createSafeActionClient({ defaultValidationErrorsShape: "flattened" });
+
+// Per-action override
+authClient.inputSchema(schema, {
+  handleValidationErrorsShape: (ve) => flattenValidationErrors(ve),
+}).action(async ({ parsedInput }) => { /* ... */ });
+```
+
+### Utility imports
+
+```ts
+import {
+  returnValidationErrors,
+  flattenValidationErrors,
+  formatValidationErrors,
+  DEFAULT_SERVER_ERROR_MESSAGE,
+} from "next-safe-action";
+```
+
+- `flattenValidationErrors(ve)` — converts formatted errors to `{ formErrors, fieldErrors }`
+- `formatValidationErrors(ve)` — identity function, explicit "use default shape"
+- `DEFAULT_SERVER_ERROR_MESSAGE` — `"Something went wrong while executing the operation."`
+
+## 4. Consuming Actions in Client Components
+
+### Direct call (simple one-off)
+
+```tsx
+const result = await myAction(input);
+if (result?.data) { /* success */ }
+else if (result?.validationErrors) { /* show field errors */ }
+else if (result?.serverError) { /* show toast */ }
+```
+
+### useAction hook (reactive UI)
+
+```tsx
+"use client";
+
+import { useAction } from "next-safe-action/hooks";
+import { createResumeAction } from "@/app/actions/resume";
+
+export function CreateResumeButton() {
+  const { execute, isExecuting } = useAction(createResumeAction, {
+    onSuccess: ({ data }) => { toast.success("CV créé"); },
+    onError: ({ error }) => { toast.error(error.serverError ?? "Erreur"); },
+  });
+
+  return (
+    <button onClick={() => execute({ title: "Mon CV" })} disabled={isExecuting}>
+      {isExecuting ? "Création..." : "Créer un CV"}
+    </button>
+  );
+}
+```
+
+### useOptimisticAction (instant UI)
+
+Pass `currentState` from a Server Component prop and an `updateFn`:
+
+```tsx
+const { execute, optimisticState } = useOptimisticAction(addItemAction, {
+  currentState: items,
+  updateFn: (state, input) => [...state, { id: "temp", ...input }],
+});
+```
+
+## 5. React Hook Form Integration
+
+Use `@next-safe-action/adapter-react-hook-form` for forms. Import hooks from the `/hooks` subpath:
+
+```tsx
+"use client";
+
+import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hooks";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { createUserAction } from "@/app/actions/user";
+import { createUserSchema } from "@/lib/schemas/user";
+
+export function CreateUserForm() {
+  const { form, action, handleSubmitWithAction, resetFormAndAction } =
+    useHookFormAction(createUserAction, zodResolver(createUserSchema), {
+      formProps: { defaultValues: { name: "", email: "" } },
+      actionProps: {
+        onSuccess: ({ data }) => {
+          toast.success("Utilisateur créé");
+          resetFormAndAction();
+        },
+      },
+    });
+
+  return (
+    <form onSubmit={handleSubmitWithAction}>
+      <input {...form.register("name")} />
+      {form.formState.errors.name && <p>{form.formState.errors.name.message}</p>}
+      {action.result.serverError && <p>{action.result.serverError}</p>}
+      <button type="submit" disabled={action.isPending}>Créer</button>
+    </form>
+  );
+}
+```
+
+- `useHookFormAction` — standard forms
+- `useHookFormOptimisticAction` — forms with optimistic updates
+- `useHookFormActionErrorMapper` — manual control over `useForm` + `useAction` separately
+
+Share the same Zod schema between `.inputSchema()` and `zodResolver()` so client and server validation stay in sync.
+
+## 6. Bind Arguments (server-side IDs)
+
+Use `.bindArgsSchemas()` to pass tamper-proof values from Server Components:
+
+```ts
+export const updateItemAction = authClient
+  .bindArgsSchemas<[itemId: z.ZodString]>([z.string().uuid()])
+  .inputSchema(z.object({ name: z.string().min(1) }))
+  .action(async ({ parsedInput, bindArgsParsedInputs: [itemId], ctx }) => {
+    // itemId is validated and can't be changed by the client
+  });
+```
+
+Bind in a Server Component: `const boundAction = updateItemAction.bind(null, item.id);`
+
+## 7. Middleware Patterns
+
+Middleware wraps server code like an onion — each layer calls `next()`, awaits the result, and returns it. Code **before** `next()` runs on the way in, code **after** runs on the way out.
+
+### Middleware function arguments
+
+Each `.use()` callback receives a single object:
+
+| Property | Type | Description |
+|---|---|---|
+| `clientInput` | `unknown` | Raw unvalidated input from the client |
+| `bindArgsClientInputs` | `unknown[]` | Raw bound argument values |
+| `ctx` | `Ctx` | Accumulated context from previous middleware |
+| `metadata` | `MD` | Action metadata (if `defineMetadataSchema` is set) |
+| `next` | `(opts?) => Promise` | Calls the next layer; pass `{ ctx: { ... } }` to extend context |
+
+### Instance-level (shared across all actions using that client)
+
+```ts
+export const authClient = actionClient.use(async ({ next }) => {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) throw new Error("Non autorisé");
+  return next({ ctx: { user: session.user, session } });
+});
+```
+
+### Action-level (scoped to one action)
+
+```ts
+export const sensitiveAction = authClient
+  .use(async ({ next, ctx }) => {
+    await checkRateLimit(ctx.user.id);
+    return next();
+  })
+  .inputSchema(schema)
+  .action(async ({ parsedInput, ctx }) => { /* ... */ });
+```
+
+### Before/after pattern (logging, timing)
+
+```ts
+actionClient.use(async ({ next, metadata }) => {
+  const start = Date.now();
+  const result = await next();
+  console.log(`Action ${JSON.stringify(metadata)} took ${Date.now() - start}ms`);
+  return result;
+});
+```
+
+### Short-circuiting
+
+Throw an error to stop the pipeline — server code never runs:
+
+```ts
+.use(async ({ next, ctx }) => {
+  if (ctx.user.banned) throw new Error("Compte suspendu");
+  return next();
+})
+```
+
+### Context accumulation
+
+Each middleware can add to `ctx`. Downstream layers and server code see the merged result:
+
+```ts
+const actionClient = createSafeActionClient()
+  .use(async ({ next }) => {
+    return next({ ctx: { requestId: crypto.randomUUID() } });
+  })
+  .use(async ({ next }) => {
+    const session = await auth.api.getSession({ headers: await headers() });
+    return next({ ctx: { user: session?.user ?? null } });
+  });
+// In action: ctx = { requestId: string, user: User | null }
+```
+
+### Standalone reusable middleware
+
+Use `createMiddleware()` for middleware defined outside a client (sharable across clients or packages):
+
+```ts
+import { createMiddleware } from "next-safe-action";
+
+export const adminGuard = createMiddleware<{
+  ctx: { user: { role: string } };
+}>().define(async ({ next, ctx }) => {
+  if (ctx.user.role !== "admin") throw new Error("Accès interdit");
+  return next();
+});
+```
+
+The generic `<{ ctx: ... }>` declares what the middleware requires. TypeScript errors if the client doesn't satisfy it.
+
+## 8. Metadata
+
+Metadata attaches type-safe data to each action, accessible in middleware. Useful for logging, permission checks, rate limiting, and analytics.
+
+### Define a metadata schema on the client
+
+```ts
+import { z } from "zod";
+import { createSafeActionClient } from "next-safe-action";
+
+export const actionClient = createSafeActionClient({
+  handleServerError(e) { /* ... */ },
+  defineMetadataSchema() {
+    return z.object({
+      actionName: z.string(),
+      requiredRole: z.enum(["user", "admin"]).optional(),
+    });
+  },
+});
+```
+
+### Set metadata on each action
+
+Once `defineMetadataSchema` is set, `.metadata()` is **required** before `.action()`:
+
+```ts
+export const deleteUserAction = authClient
+  .metadata({ actionName: "deleteUser", requiredRole: "admin" })
+  .inputSchema(z.object({ userId: z.string() }))
+  .action(async ({ parsedInput, ctx }) => { /* ... */ });
+```
+
+TypeScript enforces the shape — missing or wrong fields cause compile errors.
+
+### Use metadata in middleware
+
+```ts
+export const actionClient = createSafeActionClient({
+  defineMetadataSchema() {
+    return z.object({ actionName: z.string(), requiredRole: z.enum(["user", "admin"]).optional() });
+  },
+}).use(async ({ next, metadata }) => {
+  console.log(`Running: ${metadata.actionName}`);
+  return next();
+}).use(async ({ next, metadata, ctx }) => {
+  if (metadata.requiredRole && ctx.user.role !== metadata.requiredRole) {
+    throw new Error(`Rôle requis : ${metadata.requiredRole}`);
+  }
+  return next();
+});
+```
+
+### Common metadata fields
+
+| Use case | Fields |
+|---|---|
+| Logging | `actionName`, `category` |
+| Permissions | `requiredRole`, `requiredPermissions` |
+| Rate limiting | `rateLimit`, `rateLimitWindow` |
+| Feature flags | `feature`, `experimentGroup` |
+| Analytics | `trackingEvent`, `source` |
+
+## 9. Framework Errors (redirect, notFound, etc.)
+
+Next.js navigation functions (`redirect()`, `notFound()`, `forbidden()`, `unauthorized()`) work inside safe actions. next-safe-action detects them, re-throws so Next.js handles the navigation, and notifies hooks.
+
+```ts
+import { redirect } from "next/navigation";
+
+export const loginAction = actionClient
+  .inputSchema(loginSchema)
+  .action(async ({ parsedInput }) => {
+    const user = await authenticate(parsedInput);
+    if (!user) {
+      returnValidationErrors(loginSchema, { _errors: ["Identifiants invalides"] });
+    }
+    redirect("/dashboard");
+  });
+```
+
+### Navigation kinds
+
+| Function | `navigationKind` | HTTP Status |
+|---|---|---|
+| `redirect()` | `"redirect"` | 303/307/308 |
+| `notFound()` | `"notFound"` | 404 |
+| `forbidden()` | `"forbidden"` | 403 |
+| `unauthorized()` | `"unauthorized"` | 401 |
+
+### Handling in hooks
+
+When a framework navigation fires, `onSuccess` does **NOT** fire — use `onNavigation` instead:
+
+```tsx
+const { execute, hasNavigated } = useAction(loginAction, {
+  onNavigation: ({ navigationKind }) => {
+    if (navigationKind === "redirect") { /* cleanup */ }
+  },
+  onSuccess: ({ data }) => {
+    // Does NOT fire when redirect() is called
+  },
+});
+```
+
+With direct calls, if `redirect()` was called the function never returns a result — the browser navigates instead.
+
+## Anti-Patterns
+
+```ts
+// BAD: Manual { success, error } envelope
+export async function myAction(input) {
+  try { return { success: true, data: result }; }
+  catch { return { success: false, error: "Failed" }; }
+}
+
+// GOOD: Let next-safe-action structure the result
+export const myAction = authClient
+  .inputSchema(schema)
+  .action(async ({ parsedInput }) => result);
+```
+
+```ts
+// BAD: Manual zod.parse inside action body
+const parsed = schema.parse(input);
+
+// GOOD: Use .inputSchema() — validation happens before your code runs
+authClient.inputSchema(schema).action(async ({ parsedInput }) => { ... });
+```
+
+```ts
+// BAD: Returning { error: "..." } for business logic errors
+return { error: "Email taken" };
+
+// GOOD: Use returnValidationErrors for field-level errors
+returnValidationErrors(schema, { email: { _errors: ["Email taken"] } });
+```
+
+```ts
+// BAD: Missing "use server" directive
+export const action = actionClient.action(async () => {});
+
+// GOOD: Always include at the top of the file
+"use server";
+```
+
+## Troubleshooting
+
+### "The inferred type cannot be named" in monorepo
+
+Add `baseUrl` to the app's `tsconfig.json`:
+
+```json
+{ "compilerOptions": { "baseUrl": "." } }
+```
+
+### Validation errors typed as `any`
+
+Use `InferSafeActionFnResult` to get proper types:
+
+```ts
+import type { InferSafeActionFnResult } from "next-safe-action";
+type Result = InferSafeActionFnResult<typeof myAction>;
+```
+
+### `redirect()` doesn't seem to work
+
+`redirect()` works — but `onSuccess` does **not** fire when it's called. Use `onNavigation` instead (see section 9).
+
+### `useAction` callbacks fire multiple times
+
+Ensure `execute` is not called inside a `useEffect` without proper deps, or in a render loop. `execute` is stable but re-calling it restarts the lifecycle.
+
+### Form action doesn't receive validation errors
+
+When using `.stateAction()` with `useActionState`, ensure the action is defined with `.stateAction()` (not `.action()`). For `useHookFormAction`, server validation errors are auto-mapped to form fields only if the field names match the schema.
