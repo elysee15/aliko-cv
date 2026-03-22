@@ -26,7 +26,8 @@ export async function deleteAccountAction(
     await deleteUserAccount(db, currentUser.id);
 
     return { success: true, data: null };
-  } catch {
+  } catch (e) {
+    console.error("[account] deleteAccountAction failed:", e);
     return { success: false, error: "Impossible de supprimer le compte." };
   }
 }

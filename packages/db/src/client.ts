@@ -1,3 +1,6 @@
+import type { ExtractTablesWithRelations } from "drizzle-orm";
+import type { NodePgQueryResultHKT } from "drizzle-orm/node-postgres";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -27,6 +30,14 @@ export const db = drizzle({
 });
 
 export type Database = typeof db;
+
+export type TransactionClient = PgTransaction<
+  NodePgQueryResultHKT,
+  typeof schema,
+  ExtractTablesWithRelations<typeof schema>
+>;
+
+export type DatabaseOrTransaction = Database | TransactionClient;
 
 /** Call on graceful shutdown (e.g. scripts), not required per-request in Next.js. */
 export async function closeDb(): Promise<void> {
