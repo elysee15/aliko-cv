@@ -11,67 +11,75 @@ export async function GET() {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  const userId = session.user.id;
+  try {
+    const userId = session.user.id;
 
-  const [resumes, apiKeys] = await Promise.all([
-    getFullResumesByUser(db, userId),
-    getApiKeysByUser(db, userId),
-  ]);
+    const [resumes, apiKeys] = await Promise.all([
+      getFullResumesByUser(db, userId),
+      getApiKeysByUser(db, userId),
+    ]);
 
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    account: {
-      id: session.user.id,
-      name: session.user.name,
-      email: session.user.email,
-      image: session.user.image,
-      createdAt: session.user.createdAt,
-    },
-    resumes: resumes.map((r) => ({
-      id: r.id,
-      title: r.title,
-      slug: r.slug,
-      summary: r.summary,
-      template: r.template,
-      status: r.status,
-      contact: {
-        phone: r.phone,
-        website: r.website,
-        linkedin: r.linkedin,
-        github: r.github,
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        image: session.user.image,
+        createdAt: session.user.createdAt,
       },
-      sections: r.sections.map((s) => ({
-        type: s.type,
-        title: s.title,
-        visible: s.visible,
-        entries: s.entries.map((e) => ({
-          title: e.title,
-          subtitle: e.subtitle,
-          organization: e.organization,
-          location: e.location,
-          startDate: e.startDate,
-          endDate: e.endDate,
-          current: e.current,
-          description: e.description,
-          visible: e.visible,
+      resumes: resumes.map((r) => ({
+        id: r.id,
+        title: r.title,
+        slug: r.slug,
+        summary: r.summary,
+        template: r.template,
+        status: r.status,
+        contact: {
+          phone: r.phone,
+          website: r.website,
+          linkedin: r.linkedin,
+          github: r.github,
+        },
+        sections: r.sections.map((s) => ({
+          type: s.type,
+          title: s.title,
+          visible: s.visible,
+          entries: s.entries.map((e) => ({
+            title: e.title,
+            subtitle: e.subtitle,
+            organization: e.organization,
+            location: e.location,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            current: e.current,
+            description: e.description,
+            visible: e.visible,
+          })),
         })),
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
       })),
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt,
-    })),
-    apiKeys: apiKeys.map((k) => ({
-      id: k.id,
-      name: k.name,
-      keyPrefix: k.keyPrefix,
-      createdAt: k.createdAt,
-      lastUsedAt: k.lastUsedAt,
-    })),
-  };
+      apiKeys: apiKeys.map((k) => ({
+        id: k.id,
+        name: k.name,
+        keyPrefix: k.keyPrefix,
+        createdAt: k.createdAt,
+        lastUsedAt: k.lastUsedAt,
+      })),
+    };
 
-  return new NextResponse(JSON.stringify(payload, null, 2), {
-    headers: {
-      "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="aliko-cv-export-${Date.now()}.json"`,
-    },
-  });
+    return new NextResponse(JSON.stringify(payload, null, 2), {
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Disposition": `attachment; filename="aliko-cv-export-${Date.now()}.json"`,
+      },
+    });
+  } catch (e) {
+    console.error("[account/export] Failed to export user data:", e);
+    return NextResponse.json(
+      { error: "Erreur lors de l'export des données." },
+      { status: 500 },
+    );
+  }
 }

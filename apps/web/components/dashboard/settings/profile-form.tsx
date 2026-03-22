@@ -56,7 +56,7 @@ export function ProfileForm({ name, image }: Props) {
     try {
       const { error } = await authClient.updateUser({
         name: values.name,
-        image: values.image || undefined,
+        image: values.image || null,
       });
 
       if (error) {
@@ -104,6 +104,7 @@ export function ProfileForm({ name, image }: Props) {
               <Input
                 id="profile-name"
                 placeholder="Jean Dupont"
+                autoComplete="name"
                 aria-required="true"
                 aria-invalid={!!errors.name}
                 aria-describedby={

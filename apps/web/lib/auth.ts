@@ -1,4 +1,3 @@
-import type { Auth } from "better-auth";
 import { initAuth } from "@aliko-cv/auth";
 
 import { env } from "../env";
@@ -11,4 +10,4 @@ export const auth = initAuth({
   baseUrl,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
-}) as Auth;
+});
