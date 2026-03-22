@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "push": "bun run with-env drizzle-kit push",
     "studio": "bun run with-env drizzle-kit studio",

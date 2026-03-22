@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 
 import { db } from "@aliko-cv/db/client";
-import { getResumeById, getCommentCountsBySections } from "@aliko-cv/db/queries";
+import { getResumeById, getCommentCountsBySections, getRecentEntriesBySource } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
 import { Button } from "@workspace/ui/components/button";
@@ -19,6 +19,7 @@ import { AtsAnalyzer } from "@/components/resume/ats-analyzer";
 import { QuickApplyButton } from "@/components/resume/quick-apply-button";
 import { ResumePreview } from "@/components/resume/resume-preview";
 import { SplitViewShell } from "@/components/dashboard/resume/editor/split-view-shell";
+import { TelegramUpdatesBanner } from "@/components/dashboard/resume/editor/telegram-updates-banner";
 import type { TemplateType } from "@/lib/schemas/resume";
 
 type Params = Promise<{ id: string }>;
@@ -47,6 +48,14 @@ export default async function ResumeEditorPage({
     resume.sections.map((s) => s.id),
     session.user.id,
   );
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const telegramUpdates = await getRecentEntriesBySource(db, {
+    userId: session.user.id,
+    resumeId: id,
+    source: "telegram",
+    since: sevenDaysAgo,
+  });
 
   const toolbar = (
     <div className="flex items-center gap-3 border-b px-4 py-3">
@@ -79,6 +88,8 @@ export default async function ResumeEditorPage({
 
   const editorPane = (
     <div className="space-y-6 p-4">
+      <TelegramUpdatesBanner updates={telegramUpdates} />
+
       <ResumeHeaderEditor
         id={resume.id}
         title={resume.title}

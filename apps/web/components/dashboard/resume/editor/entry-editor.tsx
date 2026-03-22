@@ -7,9 +7,11 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   GripVerticalIcon,
+  SendIcon,
   TrashIcon,
 } from "lucide-react";
 
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -37,6 +39,7 @@ type Entry = {
   description: string | null;
   sortOrder: number;
   visible: boolean;
+  source: string;
 };
 
 type Props = {
@@ -165,6 +168,12 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
         >
           <ChevronDownIcon className="size-3.5 text-muted-foreground" />
           <span className="font-medium">{form.title || entry.title}</span>
+          {entry.source === "telegram" && (
+            <Badge variant="outline" className="gap-1 text-[10px] leading-tight">
+              <SendIcon className="size-2.5" />
+              Telegram
+            </Badge>
+          )}
           {isTag && form.subtitle && (
             <span className="text-muted-foreground">({form.subtitle})</span>
           )}

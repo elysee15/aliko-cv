@@ -34,6 +34,7 @@ export async function createApiKey(
   db: DatabaseOrTransaction,
   userId: string,
   name: string,
+  scope: "read" | "read_write" = "read",
 ) {
   const rawKey = generateRawKey();
   const keyHash = await sha256(rawKey);
@@ -41,11 +42,12 @@ export async function createApiKey(
 
   const [row] = await db
     .insert(apiKey)
-    .values({ userId, name, keyHash, keyPrefix })
+    .values({ userId, name, keyHash, keyPrefix, scope })
     .returning({
       id: apiKey.id,
       name: apiKey.name,
       keyPrefix: apiKey.keyPrefix,
+      scope: apiKey.scope,
       createdAt: apiKey.createdAt,
     });
 
@@ -58,6 +60,7 @@ export async function getApiKeysByUser(db: DatabaseOrTransaction, userId: string
       id: apiKey.id,
       name: apiKey.name,
       keyPrefix: apiKey.keyPrefix,
+      scope: apiKey.scope,
       lastUsedAt: apiKey.lastUsedAt,
       createdAt: apiKey.createdAt,
     })
@@ -91,13 +94,13 @@ export async function revokeApiKey(
 }
 
 /**
- * Validate an API key and return the associated user ID.
+ * Validate an API key and return the associated user ID + scope.
  * Also updates `lastUsedAt`.
  */
 export async function validateApiKey(
   db: Database,
   rawKey: string,
-): Promise<string | null> {
+): Promise<{ userId: string; scope: "read" | "read_write" } | null> {
   const keyHash = await sha256(rawKey);
   const row = await db.query.apiKey.findFirst({
     where: and(eq(apiKey.keyHash, keyHash), isNull(apiKey.revokedAt)),
@@ -110,5 +113,5 @@ export async function validateApiKey(
     .set({ lastUsedAt: new Date() })
     .where(eq(apiKey.id, row.id));
 
-  return row.userId;
+  return { userId: row.userId, scope: row.scope };
 }

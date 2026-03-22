@@ -38,6 +38,13 @@ export const resumeTemplateEnum = pgEnum("resume_template", [
   "compact",
 ]);
 
+export const sourceTypeEnum = pgEnum("source_type", [
+  "web",
+  "telegram",
+  "api",
+  "import",
+]);
+
 // ---------------------------------------------------------------------------
 // Resume — the top-level CV entity
 // ---------------------------------------------------------------------------
@@ -92,6 +99,7 @@ export const resumeSection = pgTable(
     title: text("title").notNull(),
     sortOrder: integer("sort_order").default(0).notNull(),
     visible: boolean("visible").default(true).notNull(),
+    source: sourceTypeEnum("source").default("web").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -124,13 +132,17 @@ export const resumeEntry = pgTable(
     description: text("description"),
     sortOrder: integer("sort_order").default(0).notNull(),
     visible: boolean("visible").default(true).notNull(),
+    source: sourceTypeEnum("source").default("web").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("resumeEntry_sectionId_idx").on(table.sectionId)],
+  (table) => [
+    index("resumeEntry_sectionId_idx").on(table.sectionId),
+    index("resumeEntry_source_createdAt_idx").on(table.source, table.createdAt),
+  ],
 );
 
 // ---------------------------------------------------------------------------

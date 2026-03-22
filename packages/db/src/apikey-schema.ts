@@ -1,7 +1,12 @@
 import { relations } from "drizzle-orm";
-import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, pgEnum, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema";
+
+export const apiKeyScopeEnum = pgEnum("api_key_scope", [
+  "read",
+  "read_write",
+]);
 
 export const apiKey = pgTable(
   "api_key",
@@ -17,6 +22,7 @@ export const apiKey = pgTable(
     keyHash: text("key_hash").notNull().unique(),
     /** First 8 chars of the key for display ("ak_xxxxxxxx…") */
     keyPrefix: text("key_prefix").notNull(),
+    scope: apiKeyScopeEnum("scope").default("read").notNull(),
     lastUsedAt: timestamp("last_used_at"),
     revokedAt: timestamp("revoked_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

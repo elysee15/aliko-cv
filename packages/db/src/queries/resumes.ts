@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 
-import type { Database } from "../client";
+import type { Database, DatabaseOrTransaction } from "../client";
 import { resume, resumeSection, resumeEntry } from "../cv-schema";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +44,7 @@ export type CreateSectionParams = {
     | "custom";
   title: string;
   sortOrder?: number;
+  source?: "web" | "telegram" | "api" | "import";
 };
 
 export type UpdateSectionParams = {
@@ -64,6 +65,7 @@ export type CreateEntryParams = {
   current?: boolean;
   description?: string;
   sortOrder?: number;
+  source?: "web" | "telegram" | "api" | "import";
 };
 
 export type UpdateEntryParams = {
@@ -129,7 +131,18 @@ export async function getResumeById(
 }
 
 export async function createResume(db: Database, params: CreateResumeParams) {
-  const [row] = await db.insert(resume).values(params).returning();
+  const [row] = await db
+    .insert(resume)
+    .values(params)
+    .returning({
+      id: resume.id,
+      title: resume.title,
+      slug: resume.slug,
+      userId: resume.userId,
+      status: resume.status,
+      template: resume.template,
+      createdAt: resume.createdAt,
+    });
   return row;
 }
 
@@ -185,13 +198,77 @@ export async function createResumeWithSections(
   });
 }
 
+export type CreateResumeFromImportParams = {
+  userId: string;
+  title: string;
+  slug: string;
+  summary?: string;
+  linkedin?: string;
+  sections: {
+    section: Omit<CreateSectionParams, "resumeId">;
+    entries: Omit<CreateEntryParams, "sectionId">[];
+  }[];
+};
+
+export async function createResumeFromImport(
+  db: DatabaseOrTransaction,
+  params: CreateResumeFromImportParams,
+) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(resume)
+      .values({
+        userId: params.userId,
+        title: params.title,
+        slug: params.slug,
+        summary: params.summary,
+        linkedin: params.linkedin,
+      })
+      .returning({ id: resume.id, title: resume.title });
+
+    if (!row) throw new Error("Failed to create resume");
+
+    for (const { section, entries } of params.sections) {
+      const [created] = await tx
+        .insert(resumeSection)
+        .values({ ...section, resumeId: row.id })
+        .returning({ id: resumeSection.id });
+
+      if (!created) throw new Error("Failed to create section");
+
+      if (entries.length > 0) {
+        await tx.insert(resumeEntry).values(
+          entries.map((entry) => ({
+            ...entry,
+            sectionId: created.id,
+          })),
+        );
+      }
+    }
+
+    return row;
+  });
+}
+
 export async function updateResume(db: Database, params: UpdateResumeParams) {
   const { id, userId, ...data } = params;
   const [row] = await db
     .update(resume)
     .set(data)
     .where(and(eq(resume.id, id), eq(resume.userId, userId)))
-    .returning();
+    .returning({
+      id: resume.id,
+      title: resume.title,
+      slug: resume.slug,
+      summary: resume.summary,
+      status: resume.status,
+      template: resume.template,
+      phone: resume.phone,
+      website: resume.website,
+      linkedin: resume.linkedin,
+      github: resume.github,
+      updatedAt: resume.updatedAt,
+    });
   return row;
 }
 
@@ -409,6 +486,49 @@ export async function reorderEntries(
     }
   });
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Source-based queries (Telegram, API, import tracking)
+// ---------------------------------------------------------------------------
+
+export async function getRecentEntriesBySource(
+  db: Database,
+  params: {
+    userId: string;
+    resumeId?: string;
+    source: "telegram" | "api" | "import";
+    since: Date;
+  },
+) {
+  const conditions = [
+    eq(resume.userId, params.userId),
+    eq(resumeEntry.source, params.source),
+    gte(resumeEntry.createdAt, params.since),
+  ];
+
+  if (params.resumeId) {
+    conditions.push(eq(resume.id, params.resumeId));
+  }
+
+  return db
+    .select({
+      entryId: resumeEntry.id,
+      entryTitle: resumeEntry.title,
+      entryOrganization: resumeEntry.organization,
+      entryCreatedAt: resumeEntry.createdAt,
+      sectionId: resumeSection.id,
+      sectionType: resumeSection.type,
+      sectionTitle: resumeSection.title,
+      resumeId: resume.id,
+      resumeTitle: resume.title,
+    })
+    .from(resumeEntry)
+    .innerJoin(resumeSection, eq(resumeEntry.sectionId, resumeSection.id))
+    .innerJoin(resume, eq(resumeSection.resumeId, resume.id))
+    .where(and(...conditions))
+    .orderBy(desc(resumeEntry.createdAt))
+    .limit(50);
 }
 
 // ---------------------------------------------------------------------------
