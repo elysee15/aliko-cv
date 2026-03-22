@@ -46,7 +46,10 @@ function TagSection({ section }: { section: Section }) {
 
   return (
     <div className="space-y-2">
-      <h2 className="border-b pb-1 text-sm font-semibold uppercase tracking-wider">
+      <h2
+        className="border-b pb-1 text-sm font-semibold uppercase tracking-wider"
+        style={{ borderColor: "var(--resume-accent)" }}
+      >
         {section.title}
       </h2>
       <div className="flex flex-wrap gap-1.5">
@@ -78,7 +81,10 @@ function SectionBlock({ section }: { section: Section }) {
 
   return (
     <div className="space-y-3">
-      <h2 className="border-b pb-1 text-sm font-semibold uppercase tracking-wider">
+      <h2
+        className="border-b pb-1 text-sm font-semibold uppercase tracking-wider"
+        style={{ borderColor: "var(--resume-accent)" }}
+      >
         {section.title}
       </h2>
       <div className="space-y-4">
@@ -129,7 +135,10 @@ export function ClassicTemplate({ resume }: TemplateProps) {
 
       {resume.summary && (
         <div className="space-y-1">
-          <h2 className="border-b pb-1 text-sm font-semibold uppercase tracking-wider">
+          <h2
+            className="border-b pb-1 text-sm font-semibold uppercase tracking-wider"
+            style={{ borderColor: "var(--resume-accent)" }}
+          >
             Profil
           </h2>
           <p className="text-sm">{resume.summary}</p>

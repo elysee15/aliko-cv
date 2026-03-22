@@ -33,6 +33,9 @@ export const resumeTemplateEnum = pgEnum("resume_template", [
   "classic",
   "modern",
   "minimal",
+  "executive",
+  "creative",
+  "compact",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -56,6 +59,8 @@ export const resume = pgTable(
     linkedin: text("linkedin"),
     github: text("github"),
     template: resumeTemplateEnum("template").default("classic").notNull(),
+    accentColor: text("accent_color").default("#6366f1").notNull(),
+    fontFamily: text("font_family").default("inter").notNull(),
     status: resumeStatusEnum("status").default("draft").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -66,6 +71,7 @@ export const resume = pgTable(
   (table) => [
     index("resume_userId_idx").on(table.userId),
     index("resume_slug_userId_idx").on(table.slug, table.userId),
+    index("resume_slug_status_idx").on(table.slug, table.status),
   ],
 );
 

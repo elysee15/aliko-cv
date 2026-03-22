@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { resume, resumeSection, resumeEntry } from "../cv-schema";
@@ -25,7 +25,9 @@ export type UpdateResumeParams = {
   linkedin?: string | null;
   github?: string | null;
   status?: "draft" | "published";
-  template?: "classic" | "modern" | "minimal";
+  template?: "classic" | "modern" | "minimal" | "executive" | "creative" | "compact";
+  accentColor?: string;
+  fontFamily?: string;
 };
 
 export type CreateSectionParams = {
@@ -157,7 +159,7 @@ export async function getPublishedResumeBySlug(db: Database, slug: string) {
   return db.query.resume.findFirst({
     where: and(eq(resume.slug, slug), eq(resume.status, "published")),
     with: {
-      user: true,
+      user: { columns: { name: true, email: true } },
       sections: {
         orderBy: asc(resumeSection.sortOrder),
         with: {
@@ -171,21 +173,71 @@ export async function getPublishedResumeBySlug(db: Database, slug: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Ownership helpers (single-query verification via JOIN)
+// ---------------------------------------------------------------------------
+
+async function isResumeOwner(
+  db: Database,
+  resumeId: string,
+  userId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: resume.id })
+    .from(resume)
+    .where(and(eq(resume.id, resumeId), eq(resume.userId, userId)))
+    .limit(1);
+  return !!row;
+}
+
+async function isSectionOwner(
+  db: Database,
+  sectionId: string,
+  userId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: resumeSection.id })
+    .from(resumeSection)
+    .innerJoin(resume, eq(resumeSection.resumeId, resume.id))
+    .where(and(eq(resumeSection.id, sectionId), eq(resume.userId, userId)))
+    .limit(1);
+  return !!row;
+}
+
+async function isEntryOwner(
+  db: Database,
+  entryId: string,
+  userId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: resumeEntry.id })
+    .from(resumeEntry)
+    .innerJoin(resumeSection, eq(resumeEntry.sectionId, resumeSection.id))
+    .innerJoin(resume, eq(resumeSection.resumeId, resume.id))
+    .where(and(eq(resumeEntry.id, entryId), eq(resume.userId, userId)))
+    .limit(1);
+  return !!row;
+}
+
+// ---------------------------------------------------------------------------
 // Section CRUD
 // ---------------------------------------------------------------------------
 
 export async function createSection(
   db: Database,
+  userId: string,
   params: CreateSectionParams,
 ) {
+  if (!(await isResumeOwner(db, params.resumeId, userId))) return null;
   const [row] = await db.insert(resumeSection).values(params).returning();
   return row;
 }
 
 export async function updateSection(
   db: Database,
+  userId: string,
   params: UpdateSectionParams,
 ) {
+  if (!(await isSectionOwner(db, params.id, userId))) return null;
   const { id, ...data } = params;
   const [row] = await db
     .update(resumeSection)
@@ -195,7 +247,12 @@ export async function updateSection(
   return row;
 }
 
-export async function deleteSection(db: Database, id: string) {
+export async function deleteSection(
+  db: Database,
+  id: string,
+  userId: string,
+) {
+  if (!(await isSectionOwner(db, id, userId))) return null;
   const [row] = await db
     .delete(resumeSection)
     .where(eq(resumeSection.id, id))
@@ -207,12 +264,22 @@ export async function deleteSection(db: Database, id: string) {
 // Entry CRUD
 // ---------------------------------------------------------------------------
 
-export async function createEntry(db: Database, params: CreateEntryParams) {
+export async function createEntry(
+  db: Database,
+  userId: string,
+  params: CreateEntryParams,
+) {
+  if (!(await isSectionOwner(db, params.sectionId, userId))) return null;
   const [row] = await db.insert(resumeEntry).values(params).returning();
   return row;
 }
 
-export async function updateEntry(db: Database, params: UpdateEntryParams) {
+export async function updateEntry(
+  db: Database,
+  userId: string,
+  params: UpdateEntryParams,
+) {
+  if (!(await isEntryOwner(db, params.id, userId))) return null;
   const { id, ...data } = params;
   const [row] = await db
     .update(resumeEntry)
@@ -222,7 +289,12 @@ export async function updateEntry(db: Database, params: UpdateEntryParams) {
   return row;
 }
 
-export async function deleteEntry(db: Database, id: string) {
+export async function deleteEntry(
+  db: Database,
+  id: string,
+  userId: string,
+) {
+  if (!(await isEntryOwner(db, id, userId))) return null;
   const [row] = await db
     .delete(resumeEntry)
     .where(eq(resumeEntry.id, id))
@@ -236,26 +308,55 @@ export async function deleteEntry(db: Database, id: string) {
 
 export async function reorderSections(
   db: Database,
+  userId: string,
+  resumeId: string,
   items: { id: string; sortOrder: number }[],
-) {
-  for (const item of items) {
-    await db
-      .update(resumeSection)
-      .set({ sortOrder: item.sortOrder })
-      .where(eq(resumeSection.id, item.id));
-  }
+): Promise<boolean> {
+  if (!(await isResumeOwner(db, resumeId, userId))) return false;
+  await db.transaction(async (tx) => {
+    for (const item of items) {
+      await tx
+        .update(resumeSection)
+        .set({ sortOrder: item.sortOrder })
+        .where(
+          and(
+            eq(resumeSection.id, item.id),
+            eq(resumeSection.resumeId, resumeId),
+          ),
+        );
+    }
+  });
+  return true;
 }
 
 export async function reorderEntries(
   db: Database,
+  userId: string,
+  resumeId: string,
   items: { id: string; sortOrder: number }[],
-) {
-  for (const item of items) {
-    await db
-      .update(resumeEntry)
-      .set({ sortOrder: item.sortOrder })
-      .where(eq(resumeEntry.id, item.id));
-  }
+): Promise<boolean> {
+  if (!(await isResumeOwner(db, resumeId, userId))) return false;
+
+  const validSectionIds = await db
+    .select({ id: resumeSection.id })
+    .from(resumeSection)
+    .where(eq(resumeSection.resumeId, resumeId));
+  const sectionIdSet = new Set(validSectionIds.map((s) => s.id));
+
+  await db.transaction(async (tx) => {
+    for (const item of items) {
+      await tx
+        .update(resumeEntry)
+        .set({ sortOrder: item.sortOrder })
+        .where(
+          and(
+            eq(resumeEntry.id, item.id),
+            inArray(resumeEntry.sectionId, [...sectionIdSet]),
+          ),
+        );
+    }
+  });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -279,52 +380,56 @@ export async function duplicateResume(
 
   if (!source) return null;
 
-  const [newResume] = await db
-    .insert(resume)
-    .values({
-      userId,
-      title: `${source.title} (copie)`,
-      slug: newSlug,
-      summary: source.summary,
-      phone: source.phone,
-      website: source.website,
-      linkedin: source.linkedin,
-      github: source.github,
-      template: source.template,
-      status: "draft",
-    })
-    .returning();
-
-  for (const section of source.sections) {
-    const [newSection] = await db
-      .insert(resumeSection)
+  return db.transaction(async (tx) => {
+    const [newResume] = await tx
+      .insert(resume)
       .values({
-        resumeId: newResume!.id,
-        type: section.type,
-        title: section.title,
-        sortOrder: section.sortOrder,
-        visible: section.visible,
+        userId,
+        title: `${source.title} (copie)`,
+        slug: newSlug,
+        summary: source.summary,
+        phone: source.phone,
+        website: source.website,
+        linkedin: source.linkedin,
+        github: source.github,
+        template: source.template,
+        accentColor: source.accentColor,
+        fontFamily: source.fontFamily,
+        status: "draft",
       })
       .returning();
 
-    if (section.entries.length > 0) {
-      await db.insert(resumeEntry).values(
-        section.entries.map((e) => ({
-          sectionId: newSection!.id,
-          title: e.title,
-          subtitle: e.subtitle,
-          organization: e.organization,
-          location: e.location,
-          startDate: e.startDate,
-          endDate: e.endDate,
-          current: e.current,
-          description: e.description,
-          sortOrder: e.sortOrder,
-          visible: e.visible,
-        })),
-      );
-    }
-  }
+    for (const section of source.sections) {
+      const [newSection] = await tx
+        .insert(resumeSection)
+        .values({
+          resumeId: newResume!.id,
+          type: section.type,
+          title: section.title,
+          sortOrder: section.sortOrder,
+          visible: section.visible,
+        })
+        .returning();
 
-  return newResume;
+      if (section.entries.length > 0) {
+        await tx.insert(resumeEntry).values(
+          section.entries.map((e) => ({
+            sectionId: newSection!.id,
+            title: e.title,
+            subtitle: e.subtitle,
+            organization: e.organization,
+            location: e.location,
+            startDate: e.startDate,
+            endDate: e.endDate,
+            current: e.current,
+            description: e.description,
+            sortOrder: e.sortOrder,
+            visible: e.visible,
+          })),
+        );
+      }
+    }
+
+    return newResume;
+  });
 }

@@ -40,6 +40,7 @@ const EVENTS = [
   { value: "resume.deleted", label: "CV supprimé" },
   { value: "resume.published", label: "CV publié" },
   { value: "resume.exported", label: "CV exporté" },
+  { value: "application.created", label: "Candidature créée" },
 ] as const;
 
 type Webhook = {

@@ -13,7 +13,10 @@ function DateRange({
 }) {
   if (!startDate && !endDate) return null;
   return (
-    <span className="text-xs font-medium text-primary/70">
+    <span
+      className="text-xs font-medium"
+      style={{ color: "color-mix(in srgb, var(--resume-accent) 70%, transparent)" }}
+    >
       {formatDate(startDate)}
       {(endDate || current) && " – "}
       {current ? "Présent" : formatDate(endDate)}
@@ -27,15 +30,25 @@ function TagSection({ section }: { section: Section }) {
 
   return (
     <div className="space-y-2">
-      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-primary">
-        <span className="inline-block h-0.5 w-4 rounded bg-primary" />
+      <h2
+        className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"
+        style={{ color: "var(--resume-accent)" }}
+      >
+        <span
+          className="inline-block h-0.5 w-4 rounded"
+          style={{ backgroundColor: "var(--resume-accent)" }}
+        />
         {section.title}
       </h2>
       <div className="flex flex-wrap gap-1.5 pl-6">
         {visibleEntries.map((entry) => (
           <span
             key={entry.id}
-            className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+            className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--resume-accent) 10%, transparent)",
+              color: "var(--resume-accent)",
+            }}
           >
             {entry.title}
             {entry.subtitle && (
@@ -60,8 +73,14 @@ function SectionBlock({ section }: { section: Section }) {
 
   return (
     <div className="space-y-3">
-      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-primary">
-        <span className="inline-block h-0.5 w-4 rounded bg-primary" />
+      <h2
+        className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider"
+        style={{ color: "var(--resume-accent)" }}
+      >
+        <span
+          className="inline-block h-0.5 w-4 rounded"
+          style={{ backgroundColor: "var(--resume-accent)" }}
+        />
         {section.title}
       </h2>
       <div className="space-y-4">
@@ -105,7 +124,12 @@ export function ModernTemplate({ resume }: TemplateProps) {
 
   return (
     <div className="resume-preview mx-auto max-w-[210mm] bg-white text-[13px] leading-relaxed text-foreground print:shadow-none dark:bg-background">
-      <div className="bg-primary/5 px-8 py-6 dark:bg-primary/10">
+      <div
+        className="px-8 py-6"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--resume-accent) 5%, transparent)",
+        }}
+      >
         <h1 className="font-heading text-3xl font-bold tracking-tight">
           {resume.user.name}
         </h1>

@@ -34,6 +34,8 @@ export type ResumeData = {
   sections: Section[];
   user: { name: string; email: string };
   contact?: ContactInfo;
+  accentColor?: string;
+  fontFamily?: string;
 };
 
 export type TemplateProps = {

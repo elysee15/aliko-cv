@@ -37,14 +37,14 @@ export function Toaster({ ...props }: ToasterProps) {
       toastOptions={{
         classNames: {
           toast:
-            "font-sans text-xs shadow-md ring-1 ring-foreground/10 border-none",
-          title: "font-heading text-sm font-medium",
-          description: "text-xs text-muted-foreground",
+            "font-sans text-[13px]! shadow-md ring-1 ring-foreground/10 border-none",
+          title: "font-heading text-[14px]! font-medium",
+          description: "text-[13px]! text-muted-foreground",
           actionButton:
-            "bg-primary text-primary-foreground text-xs font-medium",
-          cancelButton: "bg-muted text-muted-foreground text-xs font-medium",
+            "bg-primary text-primary-foreground text-[13px]! font-medium",
+          cancelButton: "bg-muted text-muted-foreground text-[13px]! font-medium",
           closeButton:
-            "border-border/50 bg-background text-foreground/50 hover:text-foreground",
+            "border-border/50 bg-background text-foreground/50 hover:text-foreground text-[13px]!",
         },
       }}
       {...props}

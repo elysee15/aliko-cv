@@ -20,6 +20,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.2",
+    "@next-safe-action/adapter-react-hook-form": "^2.0.3",
     "@t3-oss/env-nextjs": "^0.13.10",
     "better-auth": "^1.2.0",
     "class-variance-authority": "^0.7.1",

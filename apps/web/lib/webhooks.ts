@@ -80,8 +80,8 @@ export function dispatchWebhook(
           }
         }),
       );
-    } catch {
-      // Silently ignore — webhooks must never block the main flow
+    } catch (err) {
+      console.error("Webhook dispatch error:", err);
     }
   })();
 }

@@ -62,14 +62,6 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
   }
 
   function handleSubmit() {
-    if (!company.trim()) {
-      toast.error("L'entreprise est requise.");
-      return;
-    }
-    if (!jobTitle.trim()) {
-      toast.error("Le poste est requis.");
-      return;
-    }
     execute({
       company: company.trim(),
       jobTitle: jobTitle.trim(),
@@ -122,7 +114,7 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
             />
           </Field>
           <Field>
-            <FieldLabel>URL de l'offre</FieldLabel>
+            <FieldLabel>URL de l&apos;offre</FieldLabel>
             <Input
               type="url"
               value={jobUrl}

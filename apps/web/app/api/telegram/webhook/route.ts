@@ -108,19 +108,19 @@ async function handleAdd(chatId: number, args: string) {
   if (type === "skill") {
     const section = resume.sections.find((s) => s.type === "skills");
     if (section) {
-      await createEntry(db, {
+      await createEntry(db, link.userId, {
         sectionId: section.id,
         title: rest,
         sortOrder: section.entries.length,
       });
     } else {
-      const newSection = await createSection(db, {
+      const newSection = await createSection(db, link.userId, {
         resumeId: cvId,
         type: "skills",
         title: "Compétences",
         sortOrder: resume.sections.length,
       });
-      await createEntry(db, {
+      await createEntry(db, link.userId, {
         sectionId: newSection!.id,
         title: rest,
         sortOrder: 0,
@@ -133,19 +133,19 @@ async function handleAdd(chatId: number, args: string) {
   if (type === "language" || type === "langue") {
     const section = resume.sections.find((s) => s.type === "languages");
     if (section) {
-      await createEntry(db, {
+      await createEntry(db, link.userId, {
         sectionId: section.id,
         title: rest,
         sortOrder: section.entries.length,
       });
     } else {
-      const newSection = await createSection(db, {
+      const newSection = await createSection(db, link.userId, {
         resumeId: cvId,
         type: "languages",
         title: "Langues",
         sortOrder: resume.sections.length,
       });
-      await createEntry(db, {
+      await createEntry(db, link.userId, {
         sectionId: newSection!.id,
         title: rest,
         sortOrder: 0,
@@ -162,7 +162,7 @@ async function handleAdd(chatId: number, args: string) {
 
     const section = resume.sections.find((s) => s.type === "experience");
     if (section) {
-      await createEntry(db, {
+      await createEntry(db, link.userId, {
         sectionId: section.id,
         title,
         organization: org,
@@ -170,13 +170,13 @@ async function handleAdd(chatId: number, args: string) {
         sortOrder: section.entries.length,
       });
     } else {
-      const newSection = await createSection(db, {
+      const newSection = await createSection(db, link.userId, {
         resumeId: cvId,
         type: "experience",
         title: "Expérience",
         sortOrder: resume.sections.length,
       });
-      await createEntry(db, {
+      await createEntry(db, link.userId, {
         sectionId: newSection!.id,
         title,
         organization: org,

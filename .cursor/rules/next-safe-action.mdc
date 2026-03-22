@@ -306,44 +306,194 @@ const { execute, optimisticState } = useOptimisticAction(addItemAction, {
 
 ## 5. React Hook Form Integration
 
-Use `@next-safe-action/adapter-react-hook-form` for forms. Import hooks from the `/hooks` subpath:
+Use `@next-safe-action/adapter-react-hook-form` for forms. The adapter bridges client-side validation (React Hook Form) with server-side validation (next-safe-action), auto-mapping server validation errors back to form fields.
+
+### Package entry points
+
+| Entry point | Exports | Environment |
+|---|---|---|
+| `@next-safe-action/adapter-react-hook-form` | `mapToHookFormErrors`, `ErrorMapperProps` | Server & Client |
+| `@next-safe-action/adapter-react-hook-form/hooks` | `useHookFormAction`, `useHookFormOptimisticAction`, `useHookFormActionErrorMapper` | Client only |
+
+### How it works
+
+1. React Hook Form validates client-side first (via `zodResolver`)
+2. If valid, the data is sent to the server action
+3. Server-side validation errors are automatically mapped back to form fields via `form.formState.errors`
+
+Share the **same Zod schema** between `.inputSchema()` and `zodResolver()` so client and server validation stay in sync.
+
+### useHookFormAction (primary hook)
+
+Combines `useAction` and `useForm` into a single hook. This is the default for all multi-field forms.
+
+**Parameters:**
+
+| Param | Type |
+|---|---|
+| `safeAction` | `HookSafeActionFn<ServerError, S, CVE, Data>` |
+| `hookFormResolver` | `Resolver` (e.g. `zodResolver(schema)`) |
+| `props?` | `{ errorMapProps?, actionProps?, formProps? }` |
+
+- `formProps` — same as `UseFormProps` minus `resolver` (pass `defaultValues`, `mode`, etc.)
+- `actionProps` — same as `HookCallbacks` (`onSuccess`, `onError`, `onSettled`, etc.)
+- `errorMapProps` — `{ joinBy?: string }` to customize how multiple errors on one field are joined
+
+**Return object:**
+
+| Property | Type | Description |
+|---|---|---|
+| `form` | `UseFormReturn` | Full react-hook-form instance (`register`, `formState`, `setFocus`, etc.) |
+| `action` | `UseActionHookReturn` | Action state (`result`, `isPending`, `hasSucceeded`, etc.) |
+| `handleSubmitWithAction` | `(e?) => Promise<void>` | Pass directly to `<form onSubmit={...}>` |
+| `resetFormAndAction` | `() => void` | Resets both form fields and action state |
+
+**Example — action file:**
+
+```ts
+"use server";
+
+import { z } from "zod";
+import { authClient } from "@/lib/safe-action";
+import { db } from "@aliko-cv/db/client";
+import { revalidatePath } from "next/cache";
+
+export const createUserSchema = z.object({
+  name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
+  email: z.string().email("Format d'email invalide"),
+});
+
+export const createUserAction = authClient
+  .inputSchema(createUserSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const user = await createUser(db, { ...parsedInput, createdBy: ctx.user.id });
+    revalidatePath("/dashboard");
+    return { user };
+  });
+```
+
+**Example — form component:**
 
 ```tsx
 "use client";
 
 import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hooks";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createUserAction } from "@/app/actions/user";
-import { createUserSchema } from "@/lib/schemas/user";
+import { createUserAction, createUserSchema } from "@/app/actions/user";
 
 export function CreateUserForm() {
   const { form, action, handleSubmitWithAction, resetFormAndAction } =
     useHookFormAction(createUserAction, zodResolver(createUserSchema), {
-      formProps: { defaultValues: { name: "", email: "" } },
+      formProps: {
+        defaultValues: { name: "", email: "" },
+      },
       actionProps: {
         onSuccess: ({ data }) => {
           toast.success("Utilisateur créé");
           resetFormAndAction();
         },
+        onError: ({ error }) => {
+          toast.error(error.serverError ?? "Erreur");
+        },
       },
     });
 
   return (
-    <form onSubmit={handleSubmitWithAction}>
+    <form onSubmit={handleSubmitWithAction} noValidate>
       <input {...form.register("name")} />
-      {form.formState.errors.name && <p>{form.formState.errors.name.message}</p>}
-      {action.result.serverError && <p>{action.result.serverError}</p>}
-      <button type="submit" disabled={action.isPending}>Créer</button>
+      {form.formState.errors.name && (
+        <p>{form.formState.errors.name.message}</p>
+      )}
+
+      <input {...form.register("email")} />
+      {form.formState.errors.email && (
+        <p>{form.formState.errors.email.message}</p>
+      )}
+
+      {action.result.serverError && (
+        <p>{action.result.serverError}</p>
+      )}
+
+      <button type="submit" disabled={action.isPending}>
+        {action.isPending ? "Création…" : "Créer"}
+      </button>
     </form>
   );
 }
 ```
 
-- `useHookFormAction` — standard forms
-- `useHookFormOptimisticAction` — forms with optimistic updates
-- `useHookFormActionErrorMapper` — manual control over `useForm` + `useAction` separately
+### useHookFormOptimisticAction
 
-Share the same Zod schema between `.inputSchema()` and `zodResolver()` so client and server validation stay in sync.
+Combines `useOptimisticAction` and `useForm`. The form result updates immediately before the server responds, then reverts if the action fails.
+
+Same API as `useHookFormAction`, but `actionProps` **requires** `currentState` and `updateFn`:
+
+```tsx
+const { form, action, handleSubmitWithAction } =
+  useHookFormOptimisticAction(addItemAction, zodResolver(schema), {
+    actionProps: {
+      currentState: { items },
+      updateFn: (state, input) => ({
+        items: [...state.items, { ...input, id: crypto.randomUUID() }],
+      }),
+      onSuccess() { form.reset(); },
+    },
+    formProps: { defaultValues: { name: "" } },
+  });
+
+// Render optimistic state
+{action.optimisticState.items.map((item) => (
+  <li key={item.id}>{item.name}</li>
+))}
+```
+
+### useHookFormActionErrorMapper (advanced)
+
+Lower-level hook for cases where you need full control over `useAction` and `useForm` separately. Takes a `validationErrors` object and returns react-hook-form-compatible `FieldErrors`:
+
+```tsx
+import { useHookFormActionErrorMapper } from "@next-safe-action/adapter-react-hook-form/hooks";
+import { useAction } from "next-safe-action/hooks";
+import { useForm } from "react-hook-form";
+
+const { execute, result, isPending } = useAction(buyProductAction);
+const { hookFormValidationErrors } = useHookFormActionErrorMapper(
+  result.validationErrors
+);
+const { register, handleSubmit, formState: { errors } } = useForm({
+  resolver: zodResolver(schema),
+  errors: hookFormValidationErrors,
+});
+
+return (
+  <form onSubmit={handleSubmit((data) => execute(data))}>
+    {/* ... */}
+  </form>
+);
+```
+
+### mapToHookFormErrors (non-hook utility)
+
+Server & client utility that converts next-safe-action validation errors to react-hook-form `FieldErrors`. Used internally by `useHookFormActionErrorMapper`.
+
+```ts
+import { mapToHookFormErrors } from "@next-safe-action/adapter-react-hook-form";
+
+const fieldErrors = mapToHookFormErrors(validationErrors);
+const fieldErrors2 = mapToHookFormErrors(validationErrors, { joinBy: ", " });
+```
+
+### Type utilities
+
+```ts
+import type {
+  InferUseHookFormActionHookReturn,
+  InferUseHookFormOptimisticActionHookReturn,
+} from "@next-safe-action/adapter-react-hook-form/hooks";
+
+type MyReturn = InferUseHookFormActionHookReturn<typeof myAction>;
+type MyOptReturn = InferUseHookFormOptimisticActionHookReturn<typeof myAction, MyState>;
+```
 
 ## 6. Bind Arguments (server-side IDs)
 

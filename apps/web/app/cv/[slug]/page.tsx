@@ -68,6 +68,8 @@ export default async function PublicResumePage({
                 linkedin: resume.linkedin,
                 github: resume.github,
               },
+              accentColor: resume.accentColor,
+              fontFamily: resume.fontFamily,
             }}
           />
         </div>
