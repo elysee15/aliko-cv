@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@aliko-cv/db/client";
@@ -19,7 +19,7 @@ import {
   reorderEntries,
 } from "@aliko-cv/db/queries";
 
-import { auth } from "@/lib/auth";
+import { authClient, ActionError } from "@/lib/safe-action";
 import { dispatchWebhook } from "@/lib/webhooks";
 import {
   createResumeSchema,
@@ -29,16 +29,6 @@ import {
   createEntrySchema,
   updateEntrySchema,
 } from "@/lib/schemas/resume";
-import type {
-  CreateSectionInput,
-  UpdateSectionInput,
-  CreateEntryInput,
-  UpdateEntryInput,
-} from "@/lib/schemas/resume";
-
-export type ActionResult<T = unknown> =
-  | { success: true; data: T }
-  | { success: false; error: string };
 
 function slugify(text: string): string {
   return text
@@ -49,246 +39,197 @@ function slugify(text: string): string {
     .replace(/(^-|-$)+/g, "");
 }
 
-async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non autorisé");
-  return session.user;
-}
-
 // ---------------------------------------------------------------------------
 // Resume
 // ---------------------------------------------------------------------------
 
-export async function createResumeAction(
-  input: { title: string },
-): Promise<ActionResult> {
-  try {
-    const user = await requireUser();
-    const parsed = createResumeSchema.parse(input);
-    const slug = `${slugify(parsed.title)}-${Date.now().toString(36)}`;
+export const createResumeAction = authClient
+  .inputSchema(createResumeSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const slug = `${slugify(parsedInput.title)}-${Date.now().toString(36)}`;
 
     const resume = await createResume(db, {
-      userId: user.id,
-      title: parsed.title,
+      userId: ctx.user.id,
+      title: parsedInput.title,
       slug,
     });
 
     if (resume) {
-      dispatchWebhook(user.id, "resume.created", {
+      dispatchWebhook(ctx.user.id, "resume.created", {
         resumeId: resume.id,
         title: resume.title,
       });
     }
 
     revalidatePath("/dashboard");
-    return { success: true, data: resume };
-  } catch {
-    return { success: false, error: "Impossible de créer le CV." };
-  }
-}
+    return resume;
+  });
 
-export async function updateResumeAction(
-  id: string,
-  input: {
-    title?: string;
-    slug?: string;
-    summary?: string | null;
-    phone?: string | null;
-    website?: string | null;
-    linkedin?: string | null;
-    github?: string | null;
-    status?: "draft" | "published";
-    template?: "classic" | "modern" | "minimal";
-  },
-): Promise<ActionResult> {
-  try {
-    const user = await requireUser();
-    const parsed = updateResumeSchema.parse(input);
+export const updateResumeAction = authClient
+  .inputSchema(
+    z.object({ id: z.string().min(1), ...updateResumeSchema.shape }),
+  )
+  .action(async ({ parsedInput, ctx }) => {
+    const { id, ...data } = parsedInput;
 
     const resume = await updateResume(db, {
       id,
-      userId: user.id,
-      ...parsed,
+      userId: ctx.user.id,
+      ...data,
     });
 
     const event =
-      parsed.status === "published" ? "resume.published" : "resume.updated";
-    dispatchWebhook(user.id, event, {
+      data.status === "published" ? "resume.published" : "resume.updated";
+    dispatchWebhook(ctx.user.id, event, {
       resumeId: id,
-      ...(parsed.title && { title: parsed.title }),
-      ...(parsed.status && { status: parsed.status }),
+      ...(data.title && { title: data.title }),
+      ...(data.status && { status: data.status }),
     });
 
     revalidatePath("/dashboard");
     revalidatePath(`/dashboard/${id}`);
-    return { success: true, data: resume };
-  } catch {
-    return { success: false, error: "Impossible de mettre à jour le CV." };
-  }
-}
+    return resume;
+  });
 
-export async function deleteResumeAction(
-  id: string,
-): Promise<ActionResult> {
-  try {
-    const user = await requireUser();
-    const resume = await deleteResume(db, id, user.id);
-    if (!resume) return { success: false, error: "CV introuvable." };
+export const deleteResumeAction = authClient
+  .inputSchema(z.object({ id: z.string().min(1) }))
+  .action(async ({ parsedInput, ctx }) => {
+    const resume = await deleteResume(db, parsedInput.id, ctx.user.id);
+    if (!resume) throw new ActionError("CV introuvable.");
 
-    dispatchWebhook(user.id, "resume.deleted", { resumeId: id });
+    dispatchWebhook(ctx.user.id, "resume.deleted", {
+      resumeId: parsedInput.id,
+    });
 
     revalidatePath("/dashboard");
-    return { success: true, data: resume };
-  } catch {
-    return { success: false, error: "Impossible de supprimer le CV." };
-  }
-}
+    return resume;
+  });
 
-export async function duplicateResumeAction(
-  id: string,
-): Promise<ActionResult> {
-  try {
-    const user = await requireUser();
+export const duplicateResumeAction = authClient
+  .inputSchema(z.object({ id: z.string().min(1) }))
+  .action(async ({ parsedInput, ctx }) => {
     const slug = `copie-${Date.now().toString(36)}`;
-    const resume = await duplicateResume(db, id, user.id, slug);
-    if (!resume) return { success: false, error: "CV introuvable." };
+    const resume = await duplicateResume(
+      db,
+      parsedInput.id,
+      ctx.user.id,
+      slug,
+    );
+    if (!resume) throw new ActionError("CV introuvable.");
 
     revalidatePath("/dashboard");
-    return { success: true, data: resume };
-  } catch {
-    return { success: false, error: "Impossible de dupliquer le CV." };
-  }
-}
+    return resume;
+  });
 
 // ---------------------------------------------------------------------------
 // Reorder
 // ---------------------------------------------------------------------------
 
-export async function reorderSectionsAction(
-  resumeId: string,
-  items: { id: string; sortOrder: number }[],
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    await reorderSections(db, items);
-    revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Impossible de réordonner les sections." };
-  }
-}
+export const reorderSectionsAction = authClient
+  .inputSchema(
+    z.object({
+      resumeId: z.string().min(1),
+      items: z.array(
+        z.object({ id: z.string().min(1), sortOrder: z.number().int() }),
+      ),
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    await reorderSections(db, parsedInput.items);
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return null;
+  });
 
-export async function reorderEntriesAction(
-  resumeId: string,
-  items: { id: string; sortOrder: number }[],
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    await reorderEntries(db, items);
-    revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Impossible de réordonner les entrées." };
-  }
-}
+export const reorderEntriesAction = authClient
+  .inputSchema(
+    z.object({
+      resumeId: z.string().min(1),
+      items: z.array(
+        z.object({ id: z.string().min(1), sortOrder: z.number().int() }),
+      ),
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    await reorderEntries(db, parsedInput.items);
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return null;
+  });
 
 // ---------------------------------------------------------------------------
 // Section
 // ---------------------------------------------------------------------------
 
-export async function createSectionAction(
-  input: CreateSectionInput,
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    const parsed = createSectionSchema.parse(input);
-    const section = await createSection(db, parsed);
-    revalidatePath(`/dashboard/${parsed.resumeId}`);
-    return { success: true, data: section };
-  } catch {
-    return { success: false, error: "Impossible de créer la section." };
-  }
-}
+export const createSectionAction = authClient
+  .inputSchema(createSectionSchema)
+  .action(async ({ parsedInput }) => {
+    const section = await createSection(db, parsedInput);
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return section;
+  });
 
-export async function updateSectionAction(
-  id: string,
-  resumeId: string,
-  input: UpdateSectionInput,
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    const parsed = updateSectionSchema.parse(input);
-    const section = await updateSection(db, { id, ...parsed });
+export const updateSectionAction = authClient
+  .inputSchema(
+    z.object({
+      id: z.string().min(1),
+      resumeId: z.string().min(1),
+      ...updateSectionSchema.shape,
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    const { id, resumeId, ...data } = parsedInput;
+    const section = await updateSection(db, { id, ...data });
     revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: section };
-  } catch {
-    return { success: false, error: "Impossible de modifier la section." };
-  }
-}
+    return section;
+  });
 
-export async function deleteSectionAction(
-  id: string,
-  resumeId: string,
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    const section = await deleteSection(db, id);
-    if (!section)
-      return { success: false, error: "Section introuvable." };
-    revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: section };
-  } catch {
-    return { success: false, error: "Impossible de supprimer la section." };
-  }
-}
+export const deleteSectionAction = authClient
+  .inputSchema(
+    z.object({ id: z.string().min(1), resumeId: z.string().min(1) }),
+  )
+  .action(async ({ parsedInput }) => {
+    const section = await deleteSection(db, parsedInput.id);
+    if (!section) throw new ActionError("Section introuvable.");
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return section;
+  });
 
 // ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
-export async function createEntryAction(
-  input: CreateEntryInput,
-  resumeId: string,
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    const parsed = createEntrySchema.parse(input);
-    const entry = await createEntry(db, parsed);
+export const createEntryAction = authClient
+  .inputSchema(
+    z.object({ resumeId: z.string().min(1), ...createEntrySchema.shape }),
+  )
+  .action(async ({ parsedInput }) => {
+    const { resumeId, ...data } = parsedInput;
+    const entry = await createEntry(db, data);
     revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: entry };
-  } catch {
-    return { success: false, error: "Impossible de créer l'entrée." };
-  }
-}
+    return entry;
+  });
 
-export async function updateEntryAction(
-  id: string,
-  resumeId: string,
-  input: UpdateEntryInput,
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    const parsed = updateEntrySchema.parse(input);
-    const entry = await updateEntry(db, { id, ...parsed });
+export const updateEntryAction = authClient
+  .inputSchema(
+    z.object({
+      id: z.string().min(1),
+      resumeId: z.string().min(1),
+      ...updateEntrySchema.shape,
+    }),
+  )
+  .action(async ({ parsedInput }) => {
+    const { id, resumeId, ...data } = parsedInput;
+    const entry = await updateEntry(db, { id, ...data });
     revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: entry };
-  } catch {
-    return { success: false, error: "Impossible de modifier l'entrée." };
-  }
-}
+    return entry;
+  });
 
-export async function deleteEntryAction(
-  id: string,
-  resumeId: string,
-): Promise<ActionResult> {
-  try {
-    await requireUser();
-    const entry = await deleteEntry(db, id);
-    if (!entry)
-      return { success: false, error: "Entrée introuvable." };
-    revalidatePath(`/dashboard/${resumeId}`);
-    return { success: true, data: entry };
-  } catch {
-    return { success: false, error: "Impossible de supprimer l'entrée." };
-  }
-}
+export const deleteEntryAction = authClient
+  .inputSchema(
+    z.object({ id: z.string().min(1), resumeId: z.string().min(1) }),
+  )
+  .action(async ({ parsedInput }) => {
+    const entry = await deleteEntry(db, parsedInput.id);
+    if (!entry) throw new ActionError("Entrée introuvable.");
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return entry;
+  });

@@ -38,7 +38,7 @@ const resumeData = {
   slug: `ingenieur-full-stack-${Date.now().toString(36)}`,
   summary:
     "Développeur full-stack avec 5 ans d'expérience dans la conception et le développement d'applications web modernes. Passionné par les architectures propres, la performance et l'expérience utilisateur.",
-  status: "published" as const,
+  status: "published" as "draft" | "published",
 };
 
 type SectionSeed = {
@@ -766,6 +766,7 @@ async function seed() {
     console.log(`  ✓ User "${DEMO_USER.email}" already exists (${existingUser.id})`);
     demoUserId = existingUser.id;
   } else {
+    // @ts-expect-error Bun global available at runtime when executed with `bun`
     const passwordHash = await Bun.password.hash("Demo1234!", "bcrypt");
 
     await db.insert(user).values({

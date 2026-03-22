@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@aliko-cv/db/client";
@@ -11,62 +10,19 @@ import {
   getWebhooksByUser,
 } from "@aliko-cv/db/queries";
 
-import { auth } from "@/lib/auth";
+import { authClient, ActionError } from "@/lib/safe-action";
+import {
+  createWebhookSchema,
+  deleteWebhookSchema,
+  toggleWebhookSchema,
+} from "@/lib/schemas/webhooks";
 
-type ActionResult<T = unknown> =
-  | { success: true; data: T }
-  | { success: false; error: string };
-
-async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non autorisé");
-  return session.user;
-}
-
-const VALID_EVENTS = [
-  "resume.created",
-  "resume.updated",
-  "resume.deleted",
-  "resume.published",
-  "resume.exported",
-] as const;
-
-export async function createWebhookAction(input: {
-  url: string;
-  events: string[];
-}): Promise<ActionResult<{ id: string; secret: string }>> {
-  try {
-    const user = await requireUser();
-
-    const url = input.url?.trim();
-    if (!url) return { success: false, error: "L'URL est requise." };
-
-    try {
-      new URL(url);
-    } catch {
-      return { success: false, error: "URL invalide." };
-    }
-
-    if (!url.startsWith("https://")) {
-      return { success: false, error: "L'URL doit utiliser HTTPS." };
-    }
-
-    const events = input.events.filter((e) =>
-      (VALID_EVENTS as readonly string[]).includes(e),
-    );
-    if (events.length === 0) {
-      return {
-        success: false,
-        error: "Sélectionnez au moins un événement.",
-      };
-    }
-
-    const existing = await getWebhooksByUser(db, user.id);
+export const createWebhookAction = authClient
+  .inputSchema(createWebhookSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const existing = await getWebhooksByUser(db, ctx.user.id);
     if (existing.length >= 5) {
-      return {
-        success: false,
-        error: "Maximum 5 webhooks. Supprimez-en un d'abord.",
-      };
+      throw new ActionError("Maximum 5 webhooks. Supprimez-en un d'abord.");
     }
 
     const secret = `whsec_${Array.from(crypto.getRandomValues(new Uint8Array(24)))
@@ -74,46 +30,37 @@ export async function createWebhookAction(input: {
       .join("")}`;
 
     const hook = await createWebhook(db, {
-      userId: user.id,
-      url,
+      userId: ctx.user.id,
+      url: parsedInput.url,
       secret,
-      events,
+      events: parsedInput.events,
     });
 
     revalidatePath("/dashboard/settings/integrations");
-    return { success: true, data: { id: hook.id, secret } };
-  } catch {
-    return { success: false, error: "Erreur lors de la création." };
-  }
-}
+    return { id: hook.id, secret };
+  });
 
-export async function deleteWebhookAction(
-  id: string,
-): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const hook = await deleteWebhook(db, id, user.id);
-    if (!hook) return { success: false, error: "Webhook introuvable." };
+export const deleteWebhookAction = authClient
+  .inputSchema(deleteWebhookSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const hook = await deleteWebhook(db, parsedInput.id, ctx.user.id);
+    if (!hook) throw new ActionError("Webhook introuvable.");
 
     revalidatePath("/dashboard/settings/integrations");
-    return { success: true, data: { id: hook.id } };
-  } catch {
-    return { success: false, error: "Erreur lors de la suppression." };
-  }
-}
+    return { id: hook.id };
+  });
 
-export async function toggleWebhookAction(
-  id: string,
-  active: boolean,
-): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const hook = await toggleWebhook(db, id, user.id, active);
-    if (!hook) return { success: false, error: "Webhook introuvable." };
+export const toggleWebhookAction = authClient
+  .inputSchema(toggleWebhookSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const hook = await toggleWebhook(
+      db,
+      parsedInput.id,
+      ctx.user.id,
+      parsedInput.active,
+    );
+    if (!hook) throw new ActionError("Webhook introuvable.");
 
     revalidatePath("/dashboard/settings/integrations");
-    return { success: true, data: { id: hook.id } };
-  } catch {
-    return { success: false, error: "Erreur lors de la mise à jour." };
-  }
-}
+    return { id: hook.id };
+  });

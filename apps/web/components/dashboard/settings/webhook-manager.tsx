@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import {
   WebhookIcon,
   PlusIcon,
@@ -31,6 +32,7 @@ import {
   deleteWebhookAction,
   toggleWebhookAction,
 } from "@/app/actions/webhooks";
+import { extractActionError } from "@/lib/action-error";
 
 const EVENTS = [
   { value: "resume.created", label: "CV créé" },
@@ -62,9 +64,35 @@ export function WebhookManager({ webhooks }: Props) {
     "resume.updated",
     "resume.published",
   ]);
-  const [creating, setCreating] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const [copiedSecret, setCopiedSecret] = useState(false);
+
+  const createAction = useAction(createWebhookAction, {
+    onSuccess: ({ data }) => {
+      if (data) {
+        setNewSecret(data.secret);
+        setUrl("");
+        setSelectedEvents(["resume.created", "resume.updated", "resume.published"]);
+        setShowForm(false);
+        toast.success("Webhook créé !");
+        router.refresh();
+      }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const deleteAction = useAction(deleteWebhookAction, {
+    onSuccess: () => {
+      toast.success("Webhook supprimé.");
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const toggleAction = useAction(toggleWebhookAction, {
+    onSuccess: () => router.refresh(),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   function toggleEvent(event: string) {
     setSelectedEvents((prev) =>
@@ -74,38 +102,11 @@ export function WebhookManager({ webhooks }: Props) {
     );
   }
 
-  async function handleCreate() {
-    setCreating(true);
-    const res = await createWebhookAction({ url, events: selectedEvents });
-    if (res.success) {
-      setNewSecret(res.data.secret);
-      setUrl("");
-      setSelectedEvents(["resume.created", "resume.updated", "resume.published"]);
-      toast.success("Webhook créé !");
-      router.refresh();
-    } else {
-      toast.error(res.error);
-    }
-    setCreating(false);
-  }
-
-  async function handleDelete(id: string) {
-    const res = await deleteWebhookAction(id);
-    if (res.success) {
-      toast.success("Webhook supprimé.");
-      router.refresh();
-    } else {
-      toast.error(res.error);
-    }
-  }
-
-  async function handleToggle(id: string, active: boolean) {
-    const res = await toggleWebhookAction(id, active);
-    if (res.success) {
-      router.refresh();
-    } else {
-      toast.error(res.error);
-    }
+  function handleCreate() {
+    createAction.execute({
+      url: url.trim(),
+      events: selectedEvents as (typeof EVENTS)[number]["value"][],
+    });
   }
 
   function copySecret() {
@@ -145,7 +146,6 @@ export function WebhookManager({ webhooks }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
 
-      {/* Secret display (shown once after creation) */}
       {newSecret && (
         <div className="space-y-2 rounded-none border border-amber-300 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-900/20">
           <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
@@ -166,7 +166,6 @@ export function WebhookManager({ webhooks }: Props) {
         </div>
       )}
 
-      {/* Creation form */}
       {showForm && (
         <div className="space-y-3 rounded-none border bg-muted/30 p-3">
           <Field>
@@ -200,9 +199,9 @@ export function WebhookManager({ webhooks }: Props) {
             <Button
               size="sm"
               onClick={handleCreate}
-              disabled={creating || !url.trim() || selectedEvents.length === 0}
+              disabled={createAction.isExecuting || !url.trim() || selectedEvents.length === 0}
             >
-              {creating ? (
+              {createAction.isExecuting ? (
                 <Loader2Icon className="animate-spin" />
               ) : (
                 <PlusIcon />
@@ -220,7 +219,6 @@ export function WebhookManager({ webhooks }: Props) {
         </div>
       )}
 
-      {/* Webhook list */}
       {webhooks.length > 0 && (
         <div className="space-y-2">
           {webhooks.map((hook) => (
@@ -256,7 +254,9 @@ export function WebhookManager({ webhooks }: Props) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => handleToggle(hook.id, !hook.active)}
+                  onClick={() =>
+                    toggleAction.execute({ id: hook.id, active: !hook.active })
+                  }
                   title={hook.active ? "Désactiver" : "Activer"}
                 >
                   {hook.active ? <PowerIcon /> : <PowerOffIcon />}
@@ -264,7 +264,7 @@ export function WebhookManager({ webhooks }: Props) {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  onClick={() => handleDelete(hook.id)}
+                  onClick={() => deleteAction.execute({ id: hook.id })}
                   className="text-destructive hover:text-destructive"
                 >
                   <TrashIcon />

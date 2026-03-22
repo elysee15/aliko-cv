@@ -30,7 +30,7 @@ export const createApiKeyAction = authClient
       JSON.stringify({
         event: "api_key.created",
         userId: ctx.user.id,
-        keyPrefix: result.rawKey.slice(0, 11),
+        keyPrefix: result.key.keyPrefix,
         timestamp: new Date().toISOString(),
       }),
     );

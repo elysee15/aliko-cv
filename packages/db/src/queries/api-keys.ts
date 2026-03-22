@@ -74,7 +74,13 @@ export async function revokeApiKey(
   const [row] = await db
     .update(apiKey)
     .set({ revokedAt: new Date() })
-    .where(and(eq(apiKey.id, id), eq(apiKey.userId, userId)))
+    .where(
+      and(
+        eq(apiKey.id, id),
+        eq(apiKey.userId, userId),
+        isNull(apiKey.revokedAt),
+      ),
+    )
     .returning({
       id: apiKey.id,
       name: apiKey.name,

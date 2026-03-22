@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import { PlusIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +25,7 @@ import {
 } from "@workspace/ui/components/dialog";
 
 import { createCoverLetterAction } from "@/app/actions/cover-letters";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   resumes?: { id: string; title: string }[];
@@ -29,34 +38,33 @@ export function CreateCoverLetterDialog({ resumes = [] }: Props) {
   const [company, setCompany] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [resumeId, setResumeId] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  async function handleCreate() {
+  const { execute, isExecuting } = useAction(createCoverLetterAction, {
+    onSuccess: ({ data }) => {
+      if (data) {
+        toast.success("Lettre créée !");
+        setOpen(false);
+        setTitle("");
+        setCompany("");
+        setJobTitle("");
+        setResumeId("");
+        router.push(`/dashboard/cover-letters/${data.id}`);
+      }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  function handleCreate() {
     if (!title.trim()) {
       toast.error("Le titre est requis.");
       return;
     }
-
-    setLoading(true);
-    const res = await createCoverLetterAction({
+    execute({
       title: title.trim(),
       company: company.trim() || null,
       jobTitle: jobTitle.trim() || null,
       resumeId: resumeId || null,
     });
-
-    if (res.success) {
-      toast.success("Lettre créée !");
-      setOpen(false);
-      setTitle("");
-      setCompany("");
-      setJobTitle("");
-      setResumeId("");
-      router.push(`/dashboard/cover-letters/${res.data.id}`);
-    } else {
-      toast.error(res.error);
-    }
-    setLoading(false);
   }
 
   return (
@@ -101,26 +109,34 @@ export function CreateCoverLetterDialog({ resumes = [] }: Props) {
           {resumes.length > 0 && (
             <Field>
               <FieldLabel>CV associé</FieldLabel>
-              <select
-                value={resumeId}
-                onChange={(e) => setResumeId(e.target.value)}
-                className="flex h-8 w-full rounded-md border bg-transparent px-3 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              <Select
+                value={resumeId || "none"}
+                onValueChange={(val) => setResumeId(!val || val === "none" ? "" : val)}
+                items={[
+                  { value: "none", label: "Aucun" },
+                  ...resumes.map((r) => ({ value: r.id, label: r.title })),
+                ]}
               >
-                <option value="">Aucun</option>
-                {resumes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Aucun" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun</SelectItem>
+                  {resumes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           )}
           <Button
             onClick={handleCreate}
-            disabled={loading || !title.trim()}
+            disabled={isExecuting || !title.trim()}
             className="w-full"
           >
-            {loading ? (
+            {isExecuting ? (
               <>
                 <Loader2Icon className="animate-spin" />
                 Création…

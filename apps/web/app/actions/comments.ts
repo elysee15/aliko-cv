@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@aliko-cv/db/client";
@@ -10,89 +9,60 @@ import {
   updateComment,
   deleteComment,
 } from "@aliko-cv/db/queries";
-import { auth } from "@/lib/auth";
 
-type ActionResult<T = unknown> =
-  | { success: true; data: T }
-  | { success: false; error: string };
+import { authClient, ActionError } from "@/lib/safe-action";
+import {
+  getCommentsSchema,
+  createCommentSchema,
+  updateCommentSchema,
+  deleteCommentSchema,
+} from "@/lib/schemas/comments";
 
-async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non autorisé");
-  return session.user;
-}
+export const getCommentsAction = authClient
+  .inputSchema(getCommentsSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const comments = await getCommentsBySection(
+      db,
+      parsedInput.sectionId,
+      ctx.user.id,
+    );
+    return comments;
+  });
 
-export async function getCommentsAction(
-  sectionId: string,
-): Promise<
-  ActionResult<
-    { id: string; content: string; createdAt: Date; updatedAt: Date }[]
-  >
-> {
-  try {
-    const user = await requireUser();
-    const comments = await getCommentsBySection(db, sectionId, user.id);
-    return { success: true, data: comments };
-  } catch {
-    return { success: false, error: "Impossible de charger les commentaires." };
-  }
-}
-
-export async function createCommentAction(input: {
-  sectionId: string;
-  resumeId: string;
-  content: string;
-}): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const content = input.content?.trim();
-    if (!content) return { success: false, error: "Le commentaire est vide." };
-
+export const createCommentAction = authClient
+  .inputSchema(createCommentSchema)
+  .action(async ({ parsedInput, ctx }) => {
     const comment = await createComment(db, {
-      sectionId: input.sectionId,
-      userId: user.id,
-      content,
+      sectionId: parsedInput.sectionId,
+      userId: ctx.user.id,
+      content: parsedInput.content,
     });
 
-    revalidatePath(`/dashboard/${input.resumeId}`);
-    return { success: true, data: { id: comment.id } };
-  } catch {
-    return { success: false, error: "Impossible de créer le commentaire." };
-  }
-}
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return { id: comment.id };
+  });
 
-export async function updateCommentAction(input: {
-  id: string;
-  resumeId: string;
-  content: string;
-}): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const content = input.content?.trim();
-    if (!content) return { success: false, error: "Le commentaire est vide." };
+export const updateCommentAction = authClient
+  .inputSchema(updateCommentSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const comment = await updateComment(
+      db,
+      parsedInput.id,
+      ctx.user.id,
+      parsedInput.content,
+    );
+    if (!comment) throw new ActionError("Commentaire introuvable.");
 
-    const comment = await updateComment(db, input.id, user.id, content);
-    if (!comment) return { success: false, error: "Commentaire introuvable." };
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return { id: comment.id };
+  });
 
-    revalidatePath(`/dashboard/${input.resumeId}`);
-    return { success: true, data: { id: comment.id } };
-  } catch {
-    return { success: false, error: "Impossible de modifier le commentaire." };
-  }
-}
+export const deleteCommentAction = authClient
+  .inputSchema(deleteCommentSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const comment = await deleteComment(db, parsedInput.id, ctx.user.id);
+    if (!comment) throw new ActionError("Commentaire introuvable.");
 
-export async function deleteCommentAction(input: {
-  id: string;
-  resumeId: string;
-}): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const comment = await deleteComment(db, input.id, user.id);
-    if (!comment) return { success: false, error: "Commentaire introuvable." };
-
-    revalidatePath(`/dashboard/${input.resumeId}`);
-    return { success: true, data: { id: comment.id } };
-  } catch {
-    return { success: false, error: "Impossible de supprimer le commentaire." };
-  }
-}
+    revalidatePath(`/dashboard/${parsedInput.resumeId}`);
+    return { id: comment.id };
+  });

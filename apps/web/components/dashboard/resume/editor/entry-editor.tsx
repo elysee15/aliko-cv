@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useTransition } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import {
   ChevronDownIcon,
@@ -23,6 +23,7 @@ import {
 import type { SectionType } from "@/lib/schemas/resume";
 import { useAutosave } from "@/hooks/use-autosave";
 import { AutosaveIndicator } from "@/components/autosave-indicator";
+import { extractActionError } from "@/lib/action-error";
 
 type Entry = {
   id: string;
@@ -98,13 +99,19 @@ const subtitleLabels: Partial<Record<SectionType, string>> = {
 
 export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<EntryFormData>(() => entryToForm(entry));
   const isTag = tagTypes.has(sectionType);
 
+  const deleteAction = useAction(deleteEntryAction, {
+    onSuccess: () => toast.success("Entrée supprimée."),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
   const handleSave = useCallback(
     async (data: EntryFormData) => {
-      return updateEntryAction(entry.id, resumeId, {
+      const result = await updateEntryAction({
+        id: entry.id,
+        resumeId,
         title: data.title,
         subtitle: data.subtitle || null,
         organization: data.organization || null,
@@ -114,6 +121,8 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
         current: data.current,
         description: data.description || null,
       });
+      if (result?.serverError) toast.error(result.serverError);
+      return { success: !!result?.data };
     },
     [entry.id, resumeId],
   );
@@ -129,15 +138,10 @@ export function EntryEditor({ resumeId, sectionType, entry, dragHandleProps }: P
   }
 
   function handleDelete() {
-    startTransition(async () => {
-      const result = await deleteEntryAction(entry.id, resumeId);
-      if (result.success) {
-        toast.success("Entrée supprimée.");
-      } else {
-        toast.error(result.error);
-      }
-    });
+    deleteAction.execute({ id: entry.id, resumeId });
   }
+
+  const isPending = deleteAction.isExecuting;
 
   if (!expanded) {
     return (

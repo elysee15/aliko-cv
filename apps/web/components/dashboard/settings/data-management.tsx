@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import { DownloadIcon, Trash2Icon, AlertTriangleIcon } from "lucide-react";
 
@@ -27,16 +28,25 @@ import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Label } from "@workspace/ui/components/label";
 
 import { deleteAccountAction } from "@/app/actions/account";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   email: string;
 };
 
 export function DataManagement({ email }: Props) {
-  const [isPending, startTransition] = useTransition();
   const [confirmEmail, setConfirmEmail] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const router = useRouter();
+
+  const { execute, isExecuting } = useAction(deleteAccountAction, {
+    onSuccess: () => {
+      toast.success("Compte supprimé.");
+      router.push("/");
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   async function handleExport() {
     const res = await fetch("/api/account/export");
@@ -56,16 +66,7 @@ export function DataManagement({ email }: Props) {
   }
 
   function handleDelete() {
-    startTransition(async () => {
-      const result = await deleteAccountAction(confirmEmail);
-      if (result.success) {
-        toast.success("Compte supprimé.");
-        router.push("/");
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
+    execute({ confirmEmail });
   }
 
   return (
@@ -77,7 +78,6 @@ export function DataManagement({ email }: Props) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Export */}
         <div className="flex items-center justify-between rounded-none border p-3">
           <div>
             <p className="text-sm font-medium">Exporter mes données</p>
@@ -91,7 +91,6 @@ export function DataManagement({ email }: Props) {
           </Button>
         </div>
 
-        {/* Delete account */}
         <div className="flex items-center justify-between rounded-none border border-destructive/30 p-3">
           <div>
             <p className="text-sm font-medium text-destructive">Supprimer mon compte</p>
@@ -135,10 +134,10 @@ export function DataManagement({ email }: Props) {
               <DialogFooter>
                 <Button
                   variant="destructive"
-                  disabled={confirmEmail !== email || isPending}
+                  disabled={confirmEmail !== email || isExecuting}
                   onClick={handleDelete}
                 >
-                  {isPending ? "Suppression…" : "Supprimer définitivement"}
+                  {isExecuting ? "Suppression…" : "Supprimer définitivement"}
                 </Button>
               </DialogFooter>
             </DialogContent>

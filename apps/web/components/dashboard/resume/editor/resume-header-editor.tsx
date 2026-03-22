@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import {
   PhoneIcon,
@@ -27,6 +28,7 @@ import { Label } from "@workspace/ui/components/label";
 import { updateResumeAction } from "@/app/actions/resume";
 import { useAutosave } from "@/hooks/use-autosave";
 import { AutosaveIndicator } from "@/components/autosave-indicator";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   id: string;
@@ -60,7 +62,6 @@ export function ResumeHeaderEditor({
   github,
   status,
 }: Props) {
-  const [isPending, startTransition] = useTransition();
   const [currentTitle, setCurrentTitle] = useState(title);
   const [currentSlug, setCurrentSlug] = useState(slug);
   const [currentSummary, setCurrentSummary] = useState(summary ?? "");
@@ -68,6 +69,14 @@ export function ResumeHeaderEditor({
   const [currentWebsite, setCurrentWebsite] = useState(website ?? "");
   const [currentLinkedin, setCurrentLinkedin] = useState(linkedin ?? "");
   const [currentGithub, setCurrentGithub] = useState(github ?? "");
+
+  const { execute: executeToggle, isExecuting } = useAction(updateResumeAction, {
+    onSuccess: ({ input }) => {
+      const next = input?.status;
+      toast.success(next === "published" ? "CV publié !" : "Repassé en brouillon.");
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   const autosaveData = useMemo(
     () => ({
@@ -85,7 +94,9 @@ export function ResumeHeaderEditor({
   const handleAutoSave = useCallback(
     async (data: typeof autosaveData) => {
       if (!data.title.trim()) return { success: false };
-      return updateResumeAction(id, data);
+      const result = await updateResumeAction({ id, ...data });
+      if (result?.serverError) toast.error(result.serverError);
+      return { success: !!result?.data };
     },
     [id],
   );
@@ -99,14 +110,7 @@ export function ResumeHeaderEditor({
 
   function handleToggleStatus() {
     const next = status === "draft" ? "published" : "draft";
-    startTransition(async () => {
-      const result = await updateResumeAction(id, { status: next });
-      if (result.success) {
-        toast.success(next === "published" ? "CV publié !" : "Repassé en brouillon.");
-      } else {
-        toast.error(result.error);
-      }
-    });
+    executeToggle({ id, status: next });
   }
 
   return (
@@ -239,7 +243,7 @@ export function ResumeHeaderEditor({
             type="button"
             variant="outline"
             size="sm"
-            disabled={isPending}
+            disabled={isExecuting}
             onClick={handleToggleStatus}
           >
             {status === "draft" ? "Publier" : "Repasser en brouillon"}

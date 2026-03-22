@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 
@@ -21,42 +20,27 @@ import { Input } from "@workspace/ui/components/input";
 import { Field, FieldLabel, FieldError } from "@workspace/ui/components/field";
 import { Label } from "@workspace/ui/components/label";
 
-import {
-  createResumeSchema,
-  type CreateResumeInput,
-} from "@/lib/schemas/resume";
 import { createResumeAction } from "@/app/actions/resume";
+import { extractActionError } from "@/lib/action-error";
 
 export function CreateResumeDialog() {
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<CreateResumeInput>({
-    resolver: zodResolver(createResumeSchema),
-    defaultValues: { title: "" },
-  });
-
+  const [title, setTitle] = useState("");
   const router = useRouter();
 
-  function onSubmit(data: CreateResumeInput) {
-    startTransition(async () => {
-      const result = await createResumeAction(data);
-      if (result.success) {
+  const { execute, isExecuting, result } = useAction(createResumeAction, {
+    onSuccess: ({ data }) => {
+      if (data) {
         toast.success("CV créé !");
-        reset();
+        setTitle("");
         setOpen(false);
-        const resume = result.data as { id: string };
-        router.push(`/dashboard/${resume.id}`);
-      } else {
-        toast.error(result.error);
+        router.push(`/dashboard/${data.id}`);
       }
-    });
-  }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const titleError = result.validationErrors?.title?._errors?.[0];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -75,21 +59,27 @@ export function CreateResumeDialog() {
             Donnez un titre à votre nouveau CV pour commencer.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <Field data-invalid={!!errors.title}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            execute({ title });
+          }}
+        >
+          <Field data-invalid={!!titleError}>
             <FieldLabel>
               <Label>Titre</Label>
             </FieldLabel>
             <Input
               placeholder="Mon CV 2026"
               autoFocus
-              {...register("title")}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
-            <FieldError errors={[errors.title]} />
+            {titleError && <FieldError errors={[{ message: titleError }]} />}
           </Field>
           <DialogFooter className="mt-4">
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Création…" : "Créer"}
+            <Button type="submit" disabled={isExecuting}>
+              {isExecuting ? "Création…" : "Créer"}
             </Button>
           </DialogFooter>
         </form>

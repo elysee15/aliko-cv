@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import { PlusIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,6 +10,13 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +32,7 @@ import {
   updateApplicationAction,
   deleteApplicationAction,
 } from "@/app/actions/applications";
+import { extractActionError } from "@/lib/action-error";
 
 type ApplicationData = {
   id: string;
@@ -69,7 +78,39 @@ export function ApplicationDialog({
   const [notes, setNotes] = useState("");
   const [resumeId, setResumeId] = useState("");
   const [coverLetterId, setCoverLetterId] = useState("");
-  const [loading, setLoading] = useState(false);
+
+  const createAction = useAction(createApplicationAction, {
+    onSuccess: () => {
+      toast.success("Candidature créée !");
+      setOpen(false);
+      resetForm();
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const updateAction = useAction(updateApplicationAction, {
+    onSuccess: () => {
+      toast.success("Candidature mise à jour !");
+      setOpen(false);
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const delAction = useAction(deleteApplicationAction, {
+    onSuccess: () => {
+      toast.success("Candidature supprimée.");
+      setOpen(false);
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const loading =
+    createAction.isExecuting ||
+    updateAction.isExecuting ||
+    delAction.isExecuting;
 
   useEffect(() => {
     if (open && editData) {
@@ -97,7 +138,7 @@ export function ApplicationDialog({
     setCoverLetterId("");
   }
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!company.trim()) {
       toast.error("L'entreprise est requise.");
       return;
@@ -106,8 +147,6 @@ export function ApplicationDialog({
       toast.error("Le poste est requis.");
       return;
     }
-
-    setLoading(true);
 
     const payload = {
       company: company.trim(),
@@ -121,41 +160,15 @@ export function ApplicationDialog({
     };
 
     if (isEdit) {
-      const res = await updateApplicationAction({ id: editData.id, ...payload });
-      if (res.success) {
-        toast.success("Candidature mise à jour !");
-        setOpen(false);
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
+      updateAction.execute({ id: editData.id, ...payload });
     } else {
-      const res = await createApplicationAction(payload);
-      if (res.success) {
-        toast.success("Candidature créée !");
-        setOpen(false);
-        resetForm();
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
+      createAction.execute(payload);
     }
-
-    setLoading(false);
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!editData) return;
-    setLoading(true);
-    const res = await deleteApplicationAction(editData.id);
-    if (res.success) {
-      toast.success("Candidature supprimée.");
-      setOpen(false);
-      router.refresh();
-    } else {
-      toast.error(res.error);
-    }
-    setLoading(false);
+    delAction.execute({ id: editData.id });
   }
 
   return (
@@ -241,35 +254,51 @@ export function ApplicationDialog({
           {resumes.length > 0 && (
             <Field>
               <FieldLabel>CV associé</FieldLabel>
-              <select
-                value={resumeId}
-                onChange={(e) => setResumeId(e.target.value)}
-                className="flex h-8 w-full rounded-md border bg-transparent px-3 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              <Select
+                value={resumeId || "none"}
+                onValueChange={(val) => setResumeId(!val || val === "none" ? "" : val)}
+                items={[
+                  { value: "none", label: "Aucun" },
+                  ...resumes.map((r) => ({ value: r.id, label: r.title })),
+                ]}
               >
-                <option value="">Aucun</option>
-                {resumes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Aucun" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun</SelectItem>
+                  {resumes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           )}
           {coverLetters.length > 0 && (
             <Field>
               <FieldLabel>Lettre de motivation</FieldLabel>
-              <select
-                value={coverLetterId}
-                onChange={(e) => setCoverLetterId(e.target.value)}
-                className="flex h-8 w-full rounded-md border bg-transparent px-3 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              <Select
+                value={coverLetterId || "none"}
+                onValueChange={(val) => setCoverLetterId(!val || val === "none" ? "" : val)}
+                items={[
+                  { value: "none", label: "Aucune" },
+                  ...coverLetters.map((cl) => ({ value: cl.id, label: cl.title })),
+                ]}
               >
-                <option value="">Aucune</option>
-                {coverLetters.map((cl) => (
-                  <option key={cl.id} value={cl.id}>
-                    {cl.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Aucune" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune</SelectItem>
+                  {coverLetters.map((cl) => (
+                    <SelectItem key={cl.id} value={cl.id}>
+                      {cl.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           )}
           <Field>

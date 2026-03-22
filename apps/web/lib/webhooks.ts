@@ -9,7 +9,8 @@ export type WebhookEvent =
   | "resume.updated"
   | "resume.deleted"
   | "resume.published"
-  | "resume.exported";
+  | "resume.exported"
+  | "application.created";
 
 type WebhookPayload = {
   event: WebhookEvent;

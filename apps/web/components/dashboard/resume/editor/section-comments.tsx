@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
+import { useAction } from "next-safe-action/hooks";
 import {
   MessageSquareIcon,
   SendIcon,
@@ -21,6 +22,7 @@ import {
   updateCommentAction,
   deleteCommentAction,
 } from "@/app/actions/comments";
+import { extractActionError } from "@/lib/action-error";
 
 type Comment = {
   id: string;
@@ -88,44 +90,62 @@ export function SectionCommentPanel({
   const [newContent, setNewContent] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [isPending, startTransition] = useTransition();
+
+  const loadAction = useAction(getCommentsAction, {
+    onSuccess: ({ data }) => {
+      if (data) {
+        setComments(data);
+        setLoaded(true);
+        onCountChange?.(data.length);
+      }
+    },
+    onError: ({ error }) =>
+      toast.error(error.serverError ?? "Impossible de charger les commentaires."),
+  });
+
+  const createAction = useAction(createCommentAction, {
+    onSuccess: () => {
+      setNewContent("");
+      refreshComments();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const updateAction = useAction(updateCommentAction, {
+    onSuccess: () => {
+      setEditingId(null);
+      setEditContent("");
+      refreshComments();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const deleteAction = useAction(deleteCommentAction, {
+    onSuccess: ({ input }) => {
+      if (input) {
+        setComments((prev) => {
+          const next = prev.filter((c) => c.id !== input.id);
+          onCountChange?.(next.length);
+          return next;
+        });
+      }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   useEffect(() => {
     if (!loaded) {
-      getCommentsAction(sectionId).then((res) => {
-        if (res.success) {
-          setComments(res.data);
-          setLoaded(true);
-          onCountChange?.(res.data.length);
-        }
-      });
+      loadAction.execute({ sectionId });
     }
-  }, [loaded, sectionId, onCountChange]);
+  }, [loaded, sectionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function refreshComments() {
-    getCommentsAction(sectionId).then((r) => {
-      if (r.success) {
-        setComments(r.data);
-        onCountChange?.(r.data.length);
-      }
-    });
+    loadAction.execute({ sectionId });
   }
 
   function handleCreate() {
     if (!newContent.trim()) return;
-    startTransition(async () => {
-      const res = await createCommentAction({
-        sectionId,
-        resumeId,
-        content: newContent,
-      });
-      if (res.success) {
-        setNewContent("");
-        refreshComments();
-      } else {
-        toast.error(res.error);
-      }
-    });
+    createAction.execute({ sectionId, resumeId, content: newContent });
   }
 
   function handleStartEdit(comment: Comment) {
@@ -135,42 +155,22 @@ export function SectionCommentPanel({
 
   function handleSaveEdit() {
     if (!editingId || !editContent.trim()) return;
-    startTransition(async () => {
-      const res = await updateCommentAction({
-        id: editingId,
-        resumeId,
-        content: editContent,
-      });
-      if (res.success) {
-        setEditingId(null);
-        setEditContent("");
-        refreshComments();
-      } else {
-        toast.error(res.error);
-      }
-    });
+    updateAction.execute({ id: editingId, resumeId, content: editContent });
   }
 
   function handleDelete(id: string) {
-    startTransition(async () => {
-      const res = await deleteCommentAction({ id, resumeId });
-      if (res.success) {
-        setComments((prev) => {
-          const next = prev.filter((c) => c.id !== id);
-          onCountChange?.(next.length);
-          return next;
-        });
-      } else {
-        toast.error(res.error);
-      }
-    });
+    deleteAction.execute({ id, resumeId });
   }
 
+  const isPending =
+    createAction.isExecuting ||
+    updateAction.isExecuting ||
+    deleteAction.isExecuting;
+
   return (
-    <div className="rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+    <div className="border border-primary/20 bg-primary/3 p-3">
       <p className="mb-3 text-xs font-medium">Notes &amp; commentaires</p>
 
-      {/* Comments list */}
       {comments.length > 0 && (
         <div className="mb-3 space-y-2">
           {comments.map((c) => (
@@ -245,7 +245,6 @@ export function SectionCommentPanel({
         </div>
       )}
 
-      {/* New comment form */}
       <div className="flex gap-2">
         <Textarea
           value={newContent}

@@ -38,6 +38,7 @@ import {
   createApiKeyAction,
   revokeApiKeyAction,
 } from "@/app/actions/api-keys";
+import { extractActionError } from "@/lib/action-error";
 
 type ApiKeyRow = {
   id: string;
@@ -66,9 +67,7 @@ export function ApiKeyManager({ keys }: Props) {
         router.refresh();
       }
     },
-    onError: ({ error }) => {
-      toast.error(error.serverError ?? "Erreur");
-    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
   });
 
   const revokeAction = useAction(revokeApiKeyAction, {
@@ -76,9 +75,7 @@ export function ApiKeyManager({ keys }: Props) {
       toast.success("Clé API révoquée.");
       router.refresh();
     },
-    onError: ({ error }) => {
-      toast.error(error.serverError ?? "Erreur");
-    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
   });
 
   const nameError =
@@ -121,7 +118,8 @@ export function ApiKeyManager({ keys }: Props) {
               </code>
               <Button
                 variant="outline"
-                size="icon-sm"
+                size="icon"
+                className="min-h-11 min-w-11"
                 onClick={() => handleCopy(revealedKey)}
               >
                 {copied ? (

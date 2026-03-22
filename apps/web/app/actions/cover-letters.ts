@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@aliko-cv/db/client";
@@ -10,83 +9,51 @@ import {
   deleteCoverLetter,
 } from "@aliko-cv/db/queries";
 
-import { auth } from "@/lib/auth";
+import { authClient, ActionError } from "@/lib/safe-action";
+import {
+  createCoverLetterSchema,
+  updateCoverLetterSchema,
+  deleteCoverLetterSchema,
+} from "@/lib/schemas/cover-letters";
 
-type ActionResult<T = unknown> =
-  | { success: true; data: T }
-  | { success: false; error: string };
-
-async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non autorisé");
-  return session.user;
-}
-
-export async function createCoverLetterAction(input: {
-  title: string;
-  resumeId?: string | null;
-  company?: string | null;
-  jobTitle?: string | null;
-}): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const title = input.title?.trim();
-    if (!title) return { success: false, error: "Le titre est requis." };
-
+export const createCoverLetterAction = authClient
+  .inputSchema(createCoverLetterSchema)
+  .action(async ({ parsedInput, ctx }) => {
     const letter = await createCoverLetter(db, {
-      userId: user.id,
-      title,
-      resumeId: input.resumeId ?? null,
-      company: input.company ?? null,
-      jobTitle: input.jobTitle ?? null,
+      userId: ctx.user.id,
+      title: parsedInput.title,
+      resumeId: parsedInput.resumeId ?? null,
+      company: parsedInput.company ?? null,
+      jobTitle: parsedInput.jobTitle ?? null,
     });
 
     revalidatePath("/dashboard/cover-letters");
-    return { success: true, data: { id: letter.id } };
-  } catch {
-    return { success: false, error: "Erreur lors de la création." };
-  }
-}
+    return { id: letter.id };
+  });
 
-export async function updateCoverLetterAction(input: {
-  id: string;
-  title?: string;
-  resumeId?: string | null;
-  company?: string | null;
-  jobTitle?: string | null;
-  content?: string;
-}): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-
-    const { id, ...rest } = input;
+export const updateCoverLetterAction = authClient
+  .inputSchema(updateCoverLetterSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const { id, ...rest } = parsedInput;
     const letter = await updateCoverLetter(db, {
       id,
-      userId: user.id,
+      userId: ctx.user.id,
       ...rest,
     });
 
-    if (!letter) return { success: false, error: "Lettre introuvable." };
+    if (!letter) throw new ActionError("Lettre introuvable.");
 
     revalidatePath("/dashboard/cover-letters");
-    revalidatePath(`/dashboard/cover-letters/${input.id}`);
-    return { success: true, data: { id: letter.id } };
-  } catch {
-    return { success: false, error: "Erreur lors de la mise à jour." };
-  }
-}
+    revalidatePath(`/dashboard/cover-letters/${id}`);
+    return { id: letter.id };
+  });
 
-export async function deleteCoverLetterAction(
-  id: string,
-): Promise<ActionResult<{ id: string }>> {
-  try {
-    const user = await requireUser();
-    const letter = await deleteCoverLetter(db, id, user.id);
-    if (!letter) return { success: false, error: "Lettre introuvable." };
+export const deleteCoverLetterAction = authClient
+  .inputSchema(deleteCoverLetterSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const letter = await deleteCoverLetter(db, parsedInput.id, ctx.user.id);
+    if (!letter) throw new ActionError("Lettre introuvable.");
 
     revalidatePath("/dashboard/cover-letters");
-    return { success: true, data: { id: letter.id } };
-  } catch {
-    return { success: false, error: "Erreur lors de la suppression." };
-  }
-}
+    return { id: letter.id };
+  });

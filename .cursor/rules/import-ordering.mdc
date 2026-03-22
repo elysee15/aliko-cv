@@ -1,0 +1,117 @@
+---
+description: Import ordering conventions for this monorepo. Enforces consistent grouping to prevent the recurring import-ordering issues identified in Epic 1 code reviews.
+globs: **/*.{ts,tsx,js,jsx}
+---
+# Import Ordering
+
+Imports MUST follow this exact group order, separated by blank lines between groups. This prevents the import ordering issues that appeared in 3/6 stories during Epic 1.
+
+## Order
+
+```ts
+// 1. React / React DOM
+import { useState } from "react";
+import type { SubmitErrorHandler } from "react-hook-form";
+
+// 2. Next.js
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
+import type { Metadata } from "next";
+
+// 3. Third-party libraries
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAction } from "next-safe-action/hooks";
+import { z } from "zod";
+import { toast } from "sonner";
+import { and, eq } from "drizzle-orm";
+import { PlusIcon, TrashIcon } from "lucide-react";
+
+// 4. Workspace packages (@workspace/*, @aliko-cv/*)
+import { Button } from "@workspace/ui/components/button";
+import { Input } from "@workspace/ui/components/input";
+import { cn } from "@workspace/ui/lib/utils";
+import { db } from "@aliko-cv/db/client";
+import { createResume } from "@aliko-cv/db/queries";
+
+// 5. Local app imports (@/)
+import { auth } from "@/lib/auth";
+import { authClient } from "@/lib/safe-action";
+import { mySchema, type MyInput } from "@/lib/schemas/my-form";
+import { MyComponent } from "@/components/my-component";
+```
+
+## Rules
+
+1. **Five groups, in this exact order** — React, Next, third-party, workspace packages, local imports
+2. **Blank line between each group** — visually separates concerns
+3. **`type` imports can be inline or separate** — `import type { X }` or `import { type X }` — but stay within the same group
+4. **`export const metadata`** and other declarations go AFTER all imports — never between import statements
+5. **`"use client"` / `"use server"`** directives go on the very first line, before any imports
+6. **Icons** (`lucide-react`) belong in group 3 (third-party)
+7. **Zod** belongs in group 3 (third-party)
+
+## Common Mistake (from Epic 1 reviews)
+
+```ts
+// BAD: metadata between imports
+import { useState } from "react";
+import Link from "next/link";
+
+export const metadata: Metadata = { title: "Page" };
+
+import { Button } from "@workspace/ui/components/button";
+```
+
+```ts
+// GOOD: all imports first, then declarations
+import { useState } from "react";
+import Link from "next/link";
+import type { Metadata } from "next";
+
+import { Button } from "@workspace/ui/components/button";
+
+export const metadata: Metadata = { title: "Page" };
+```
+
+## Server Action Files
+
+```ts
+"use server";
+
+// 1. Third-party (no React/Next UI imports in server actions)
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+
+// 2. Workspace packages
+import { db } from "@aliko-cv/db/client";
+import { createApiKey } from "@aliko-cv/db/queries";
+
+// 3. Local
+import { authClient, ActionError } from "@/lib/safe-action";
+import { createApiKeySchema } from "@/lib/schemas/api-keys";
+```
+
+## Page / Layout Files (Server Components)
+
+```ts
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+
+import { db } from "@aliko-cv/db/client";
+import { getItemsByUser } from "@aliko-cv/db/queries";
+
+import { auth } from "@/lib/auth";
+import { MyComponent } from "@/components/my-component";
+
+export const metadata: Metadata = {
+  title: "Page Title",
+};
+
+export default async function Page() {
+  // ...
+}
+```
