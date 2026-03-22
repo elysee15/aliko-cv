@@ -4,15 +4,6 @@ import { z } from "zod";
 // Resume
 // ---------------------------------------------------------------------------
 
-export const createResumeSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Le titre est requis")
-    .max(200, "Le titre ne doit pas dépasser 200 caractères"),
-});
-
-export type CreateResumeInput = z.infer<typeof createResumeSchema>;
-
 export const templateTypes = [
   "classic",
   "modern",
@@ -40,6 +31,63 @@ export const templateDescriptions: Record<TemplateType, string> = {
   creative: "En-tête dégradé, sections en cartes — audacieux et unique.",
   compact: "Dense et optimisé ATS — maximum de contenu par page.",
 };
+
+export const atsTemplates = new Set<TemplateType>(["compact", "classic"]);
+
+export const defaultSectionsForTemplate: Record<
+  TemplateType,
+  { type: SectionType; title: string }[]
+> = {
+  classic: [
+    { type: "experience", title: "Expérience" },
+    { type: "education", title: "Formation" },
+    { type: "skills", title: "Compétences" },
+    { type: "languages", title: "Langues" },
+    { type: "certifications", title: "Certifications" },
+  ],
+  modern: [
+    { type: "experience", title: "Expérience" },
+    { type: "education", title: "Formation" },
+    { type: "skills", title: "Compétences" },
+    { type: "projects", title: "Projets" },
+    { type: "languages", title: "Langues" },
+  ],
+  minimal: [
+    { type: "experience", title: "Expérience" },
+    { type: "education", title: "Formation" },
+    { type: "skills", title: "Compétences" },
+  ],
+  executive: [
+    { type: "experience", title: "Expérience" },
+    { type: "education", title: "Formation" },
+    { type: "skills", title: "Compétences" },
+    { type: "certifications", title: "Certifications" },
+    { type: "languages", title: "Langues" },
+  ],
+  creative: [
+    { type: "experience", title: "Expérience" },
+    { type: "projects", title: "Projets" },
+    { type: "skills", title: "Compétences" },
+    { type: "education", title: "Formation" },
+    { type: "interests", title: "Centres d'intérêt" },
+  ],
+  compact: [
+    { type: "experience", title: "Expérience" },
+    { type: "education", title: "Formation" },
+    { type: "skills", title: "Compétences" },
+    { type: "certifications", title: "Certifications" },
+  ],
+};
+
+export const createResumeSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Le titre est requis")
+    .max(200, "Le titre ne doit pas dépasser 200 caractères"),
+  template: z.enum(templateTypes).nullable().optional(),
+});
+
+export type CreateResumeInput = z.infer<typeof createResumeSchema>;
 
 export const accentColors = [
   { value: "#6366f1", label: "Indigo" },

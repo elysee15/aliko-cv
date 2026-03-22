@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@aliko-cv/db/client";
 import {
   createResume,
+  createResumeWithSections,
   deleteResume,
   updateResume,
   createSection,
@@ -28,6 +29,7 @@ import {
   updateSectionSchema,
   createEntrySchema,
   updateEntrySchema,
+  defaultSectionsForTemplate,
 } from "@/lib/schemas/resume";
 
 function slugify(text: string): string {
@@ -47,12 +49,26 @@ export const createResumeAction = authClient
   .inputSchema(createResumeSchema)
   .action(async ({ parsedInput, ctx }) => {
     const slug = `${slugify(parsedInput.title)}-${Date.now().toString(36)}`;
+    const template = parsedInput.template;
 
-    const resume = await createResume(db, {
-      userId: ctx.user.id,
-      title: parsedInput.title,
-      slug,
-    });
+    let resume;
+
+    if (template) {
+      const sections = defaultSectionsForTemplate[template];
+      resume = await createResumeWithSections(db, {
+        userId: ctx.user.id,
+        title: parsedInput.title,
+        slug,
+        template,
+        sections,
+      });
+    } else {
+      resume = await createResume(db, {
+        userId: ctx.user.id,
+        title: parsedInput.title,
+        slug,
+      });
+    }
 
     if (resume) {
       dispatchWebhook(ctx.user.id, "resume.created", {

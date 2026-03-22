@@ -133,6 +133,58 @@ export async function createResume(db: Database, params: CreateResumeParams) {
   return row;
 }
 
+export type CreateResumeWithSectionsParams = {
+  userId: string;
+  title: string;
+  slug: string;
+  template: "classic" | "modern" | "minimal" | "executive" | "creative" | "compact";
+  sections: {
+    type:
+      | "experience"
+      | "education"
+      | "skills"
+      | "languages"
+      | "projects"
+      | "certifications"
+      | "volunteering"
+      | "interests"
+      | "custom";
+    title: string;
+  }[];
+};
+
+export async function createResumeWithSections(
+  db: Database,
+  params: CreateResumeWithSectionsParams,
+) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(resume)
+      .values({
+        userId: params.userId,
+        title: params.title,
+        slug: params.slug,
+        template: params.template,
+      })
+      .returning();
+
+    if (!row) throw new Error("Failed to create resume");
+
+    if (params.sections.length > 0) {
+      await tx.insert(resumeSection).values(
+        params.sections.map((s, i) => ({
+          resumeId: row.id,
+          type: s.type,
+          title: s.title,
+          sortOrder: i,
+        })),
+      );
+    }
+
+    return row;
+  });
+}
+
 export async function updateResume(db: Database, params: UpdateResumeParams) {
   const { id, userId, ...data } = params;
   const [row] = await db
