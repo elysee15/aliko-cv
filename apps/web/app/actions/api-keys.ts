@@ -23,7 +23,7 @@ export const createApiKeyAction = authClient
       if (existing.length >= MAX_ACTIVE_API_KEYS) {
         throw new ActionError("Maximum 5 clés API actives.");
       }
-      return createApiKey(tx, ctx.user.id, parsedInput.name);
+      return createApiKey(tx, ctx.user.id, parsedInput.name, parsedInput.scope);
     });
 
     console.info(

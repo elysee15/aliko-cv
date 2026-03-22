@@ -64,6 +64,7 @@ type Entry = {
   description: string | null;
   sortOrder: number;
   visible: boolean;
+  source: string;
 };
 
 type Props = {

@@ -12,6 +12,7 @@ import {
   CheckIcon,
 } from "lucide-react";
 
+import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -44,6 +45,7 @@ type ApiKeyRow = {
   id: string;
   name: string;
   keyPrefix: string;
+  scope: "read" | "read_write";
   lastUsedAt: Date | null;
   createdAt: Date;
 };
@@ -54,6 +56,7 @@ type Props = {
 
 export function ApiKeyManager({ keys }: Props) {
   const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyScope, setNewKeyScope] = useState<"read" | "read_write">("read");
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const router = useRouter();
@@ -82,7 +85,7 @@ export function ApiKeyManager({ keys }: Props) {
     createAction.result.validationErrors?.name?._errors?.[0];
 
   function handleCreate() {
-    createAction.execute({ name: newKeyName });
+    createAction.execute({ name: newKeyName, scope: newKeyScope });
   }
 
   function handleCopy(text: string) {
@@ -140,7 +143,12 @@ export function ApiKeyManager({ keys }: Props) {
                 className="flex items-center justify-between px-3 py-2.5"
               >
                 <div className="space-y-0.5">
-                  <p className="text-sm font-medium">{k.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{k.name}</p>
+                    <Badge variant={k.scope === "read_write" ? "default" : "secondary"} className="text-[10px] leading-tight">
+                      {k.scope === "read_write" ? "Lecture + Écriture" : "Lecture"}
+                    </Badge>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     <code>{k.keyPrefix}…</code>
                     {" · "}
@@ -193,47 +201,65 @@ export function ApiKeyManager({ keys }: Props) {
           </p>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="api-key-name">
-            Nom de la clé <span className="text-destructive">*</span>
-          </Label>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Input
-                id="api-key-name"
-                placeholder="Ex : Mon portfolio"
-                value={newKeyName}
-                onChange={(e) => {
-                  setNewKeyName(e.target.value);
-                  if (createAction.hasErrored) createAction.reset();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreate();
-                }}
-                aria-required="true"
-                aria-invalid={nameError ? true : undefined}
-                aria-describedby={nameError ? nameErrorId : undefined}
-              />
-              {nameError && (
-                <p
-                  id={nameErrorId}
-                  role="alert"
-                  className="mt-1 text-xs text-destructive"
-                >
-                  {nameError}
-                </p>
-              )}
-            </div>
-            <Button
-              size="sm"
-              className="min-h-11"
-              disabled={createAction.isExecuting}
-              onClick={handleCreate}
-            >
-              <PlusIcon />
-              {createAction.isExecuting ? "Création…" : "Créer"}
-            </Button>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="api-key-name">
+              Nom de la clé <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="api-key-name"
+              placeholder="Ex : Mon portfolio"
+              value={newKeyName}
+              onChange={(e) => {
+                setNewKeyName(e.target.value);
+                if (createAction.hasErrored) createAction.reset();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCreate();
+              }}
+              aria-required="true"
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? nameErrorId : undefined}
+            />
+            {nameError && (
+              <p
+                id={nameErrorId}
+                role="alert"
+                className="mt-1 text-xs text-destructive"
+              >
+                {nameError}
+              </p>
+            )}
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="api-key-scope">Permissions</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={`rounded-none border px-3 py-1.5 text-sm ${newKeyScope === "read" ? "border-primary bg-primary/10 font-medium" : "text-muted-foreground"}`}
+                onClick={() => setNewKeyScope("read")}
+              >
+                Lecture seule
+              </button>
+              <button
+                type="button"
+                className={`rounded-none border px-3 py-1.5 text-sm ${newKeyScope === "read_write" ? "border-primary bg-primary/10 font-medium" : "text-muted-foreground"}`}
+                onClick={() => setNewKeyScope("read_write")}
+              >
+                Lecture + Écriture
+              </button>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            disabled={createAction.isExecuting}
+            onClick={handleCreate}
+          >
+            <PlusIcon />
+            {createAction.isExecuting ? "Création…" : "Créer une clé"}
+          </Button>
         </div>
 
         <details className="text-xs text-muted-foreground">

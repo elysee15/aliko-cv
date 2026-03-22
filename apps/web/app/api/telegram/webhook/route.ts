@@ -28,6 +28,10 @@ type TelegramUpdate = {
 // Command handlers
 // ---------------------------------------------------------------------------
 
+const APP_URL =
+  process.env.BETTER_AUTH_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+
 const HELP_TEXT = `
 *Commandes disponibles :*
 
@@ -112,6 +116,7 @@ async function handleAdd(chatId: number, args: string) {
         sectionId: section.id,
         title: rest,
         sortOrder: section.entries.length,
+        source: "telegram",
       });
     } else {
       const newSection = await createSection(db, link.userId, {
@@ -119,14 +124,17 @@ async function handleAdd(chatId: number, args: string) {
         type: "skills",
         title: "Compétences",
         sortOrder: resume.sections.length,
+        source: "telegram",
       });
       await createEntry(db, link.userId, {
         sectionId: newSection!.id,
         title: rest,
         sortOrder: 0,
+        source: "telegram",
       });
     }
-    await sendTelegramMessage(chatId, `Compétence *${rest}* ajoutée à "${resume.title}".`);
+    const editUrl = `${APP_URL}/dashboard/${cvId}`;
+    await sendTelegramMessage(chatId, `Compétence *${rest}* ajoutée à "${resume.title}".\n[Modifier sur le web](${editUrl})`);
     return;
   }
 
@@ -137,6 +145,7 @@ async function handleAdd(chatId: number, args: string) {
         sectionId: section.id,
         title: rest,
         sortOrder: section.entries.length,
+        source: "telegram",
       });
     } else {
       const newSection = await createSection(db, link.userId, {
@@ -144,14 +153,17 @@ async function handleAdd(chatId: number, args: string) {
         type: "languages",
         title: "Langues",
         sortOrder: resume.sections.length,
+        source: "telegram",
       });
       await createEntry(db, link.userId, {
         sectionId: newSection!.id,
         title: rest,
         sortOrder: 0,
+        source: "telegram",
       });
     }
-    await sendTelegramMessage(chatId, `Langue *${rest}* ajoutée à "${resume.title}".`);
+    const editUrl = `${APP_URL}/dashboard/${cvId}`;
+    await sendTelegramMessage(chatId, `Langue *${rest}* ajoutée à "${resume.title}".\n[Modifier sur le web](${editUrl})`);
     return;
   }
 
@@ -168,6 +180,7 @@ async function handleAdd(chatId: number, args: string) {
         organization: org,
         current: true,
         sortOrder: section.entries.length,
+        source: "telegram",
       });
     } else {
       const newSection = await createSection(db, link.userId, {
@@ -175,6 +188,7 @@ async function handleAdd(chatId: number, args: string) {
         type: "experience",
         title: "Expérience",
         sortOrder: resume.sections.length,
+        source: "telegram",
       });
       await createEntry(db, link.userId, {
         sectionId: newSection!.id,
@@ -182,12 +196,14 @@ async function handleAdd(chatId: number, args: string) {
         organization: org,
         current: true,
         sortOrder: 0,
+        source: "telegram",
       });
     }
+    const editUrl = `${APP_URL}/dashboard/${cvId}`;
     const msg = org
       ? `Expérience *${title}* chez *${org}* ajoutée à "${resume.title}".`
       : `Expérience *${title}* ajoutée à "${resume.title}".`;
-    await sendTelegramMessage(chatId, msg);
+    await sendTelegramMessage(chatId, `${msg}\n[Modifier sur le web](${editUrl})`);
     return;
   }
 

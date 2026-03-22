@@ -1,13 +1,16 @@
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { ZodError } from "zod";
 
 import { db } from "@aliko-cv/db/client";
-import { createResume } from "@aliko-cv/db/queries";
-import { resumeSection, resumeEntry } from "@aliko-cv/db/schema";
+import { createResumeFromImport } from "@aliko-cv/db/queries";
 
 import { auth } from "@/lib/auth";
+import { dispatchWebhook } from "@/lib/webhooks";
 import { parseLinkedInZip } from "@/lib/linkedin/parser";
 import { linkedInToSections } from "@/lib/linkedin/converter";
+import { linkedInDataSchema } from "@/lib/linkedin/schema";
 
 const MAX_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -44,7 +47,8 @@ export async function POST(request: Request) {
 
   try {
     const buffer = await file.arrayBuffer();
-    const linkedInData = await parseLinkedInZip(buffer);
+    const rawData = await parseLinkedInZip(buffer);
+    const linkedInData = linkedInDataSchema.parse(rawData);
     const { summary, sections } = linkedInToSections(linkedInData);
 
     const profileName = [
@@ -54,36 +58,25 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join(" ");
 
-    const title = profileName
-      ? `CV de ${profileName}`
-      : "CV importé LinkedIn";
-
+    const title = profileName ? `CV de ${profileName}` : "CV importé LinkedIn";
     const slug = `linkedin-${Date.now().toString(36)}`;
 
-    const resume = await createResume(db, {
+    const result = await createResumeFromImport(db, {
       userId: session.user.id,
       title,
       slug,
       summary: summary ?? undefined,
+      linkedin: linkedInData.profile?.linkedinUrl ?? undefined,
+      sections,
     });
 
-    await db.transaction(async (tx) => {
-      for (const { section, entries } of sections) {
-        const [created] = await tx
-          .insert(resumeSection)
-          .values({ ...section, resumeId: resume!.id })
-          .returning({ id: resumeSection.id });
-
-        if (entries.length > 0) {
-          await tx.insert(resumeEntry).values(
-            entries.map((entry) => ({
-              ...entry,
-              sectionId: created!.id,
-            })),
-          );
-        }
-      }
+    dispatchWebhook(session.user.id, "resume.created", {
+      resumeId: result.id,
+      title: result.title,
+      source: "linkedin-import",
     });
+
+    revalidatePath("/dashboard");
 
     const stats = {
       positions: linkedInData.positions.length,
@@ -95,14 +88,45 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      resumeId: resume!.id,
+      resumeId: result.id,
       title,
       stats,
     });
   } catch (err) {
-    console.error("LinkedIn import error:", err);
+    const isDbError =
+      err instanceof Error &&
+      "severity" in err &&
+      "code" in err;
+
+    const step = isDbError
+      ? "database"
+      : err instanceof ZodError
+        ? "validation"
+        : err instanceof Error && err.message.includes("not a valid zip")
+          ? "zip-parsing"
+          : "unknown";
+
+    console.error(`LinkedIn import error [step=${step}]:`, err);
+
+    if (isDbError) {
+      return NextResponse.json(
+        { error: "Erreur serveur lors de la création du CV." },
+        { status: 500 },
+      );
+    }
+
+    const message =
+      err instanceof ZodError
+        ? "Le fichier ne contient pas les données LinkedIn attendues."
+        : err instanceof Error && err.message.includes("not a valid zip")
+          ? "Le fichier n'est pas un ZIP valide."
+          : "Impossible de parser le fichier LinkedIn.";
+
     return NextResponse.json(
-      { error: "Impossible de parser le fichier LinkedIn. Vérifiez qu'il s'agit bien du ZIP d'export officiel." },
+      {
+        error: message,
+        hint: "Vérifiez qu'il s'agit bien du ZIP d'export officiel LinkedIn.",
+      },
       { status: 422 },
     );
   }

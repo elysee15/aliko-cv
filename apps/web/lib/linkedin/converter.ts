@@ -1,4 +1,4 @@
-import type { LinkedInData } from "./parser";
+import type { LinkedInData } from "./schema";
 import type {
   CreateSectionParams,
   CreateEntryParams,
@@ -27,6 +27,7 @@ export function linkedInToSections(data: LinkedInData): {
         type: "experience",
         title: "Expérience",
         sortOrder: order++,
+        source: "import",
       },
       entries: data.positions.map((p, i) => ({
         title: p.title,
@@ -37,6 +38,7 @@ export function linkedInToSections(data: LinkedInData): {
         current: p.current,
         description: p.description ?? undefined,
         sortOrder: i,
+        source: "import" as const,
       })),
     });
   }
@@ -48,6 +50,7 @@ export function linkedInToSections(data: LinkedInData): {
         type: "education",
         title: "Formation",
         sortOrder: order++,
+        source: "import",
       },
       entries: data.education.map((e, i) => ({
         title: e.degreeName || e.schoolName,
@@ -57,6 +60,7 @@ export function linkedInToSections(data: LinkedInData): {
         current: false,
         description: [e.activities, e.notes].filter(Boolean).join("\n") || undefined,
         sortOrder: i,
+        source: "import" as const,
       })),
     });
   }
@@ -68,10 +72,12 @@ export function linkedInToSections(data: LinkedInData): {
         type: "skills",
         title: "Compétences",
         sortOrder: order++,
+        source: "import",
       },
       entries: data.skills.map((s, i) => ({
         title: s.name,
         sortOrder: i,
+        source: "import" as const,
       })),
     });
   }
@@ -83,6 +89,7 @@ export function linkedInToSections(data: LinkedInData): {
         type: "certifications",
         title: "Certifications",
         sortOrder: order++,
+        source: "import",
       },
       entries: data.certifications.map((c, i) => ({
         title: c.name,
@@ -93,6 +100,7 @@ export function linkedInToSections(data: LinkedInData): {
         current: false,
         description: c.url ?? undefined,
         sortOrder: i,
+        source: "import" as const,
       })),
     });
   }
@@ -104,11 +112,13 @@ export function linkedInToSections(data: LinkedInData): {
         type: "languages",
         title: "Langues",
         sortOrder: order++,
+        source: "import",
       },
       entries: data.languages.map((l, i) => ({
         title: l.name,
         subtitle: l.proficiency ?? undefined,
         sortOrder: i,
+        source: "import" as const,
       })),
     });
   }
