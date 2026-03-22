@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { ProfileForm } from "@/components/dashboard/settings/profile-form";
+import { ChangeEmailForm } from "@/components/dashboard/settings/change-email-form";
 import { ChangePasswordForm } from "@/components/dashboard/settings/change-password-form";
 
 export const metadata: Metadata = {
@@ -28,9 +29,10 @@ export default async function SettingsProfilePage() {
 
       <ProfileForm
         name={session.user.name}
-        email={session.user.email}
         image={session.user.image ?? null}
       />
+
+      <ChangeEmailForm email={session.user.email} />
 
       <ChangePasswordForm />
     </div>

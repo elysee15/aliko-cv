@@ -56,11 +56,8 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       });
 
       if (error) {
-        const raw = error.message;
         setGlobalError(
-          typeof raw === "string" && raw.length > 0
-            ? raw
-            : "Réinitialisation impossible. Le lien est peut-être expiré — demandez-en un nouveau."
+          "Réinitialisation impossible. Le lien est peut-être expiré — demandez-en un nouveau."
         );
         return;
       }
@@ -115,11 +112,12 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             id="reset-password"
             type="password"
             autoComplete="new-password"
-            required
             aria-required="true"
             aria-invalid={!!errors.password}
             aria-describedby={
-              errors.password ? "reset-password-error" : "reset-password-hint"
+              errors.password
+                ? "reset-password-error reset-password-hint"
+                : "reset-password-hint"
             }
             className={errors.password ? "border-destructive" : undefined}
             disabled={isSubmitting}
@@ -141,7 +139,6 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
             id="reset-password-confirm"
             type="password"
             autoComplete="new-password"
-            required
             aria-required="true"
             aria-invalid={!!errors.confirmPassword}
             aria-describedby={

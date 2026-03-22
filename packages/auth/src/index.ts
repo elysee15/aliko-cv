@@ -4,6 +4,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@aliko-cv/db/client";
 
 import { queuePasswordResetEmail } from "./reset-password-email";
+import { queueChangeEmailVerification } from "./change-email-verification";
+import { queueEmailVerification } from "./email-verification";
 
 export function initAuth(options: {
   baseUrl: string;
@@ -25,6 +27,19 @@ export function initAuth(options: {
         queuePasswordResetEmail(user, url);
       },
       revokeSessionsOnPasswordReset: true,
+    },
+    user: {
+      changeEmail: {
+        enabled: true,
+        sendChangeEmailConfirmation: async (data) => {
+          queueChangeEmailVerification(data.user, data.newEmail, data.url);
+        },
+      },
+    },
+    emailVerification: {
+      sendVerificationEmail: async (data) => {
+        queueEmailVerification(data.user, data.url);
+      },
     },
   });
 }

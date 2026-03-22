@@ -1,4 +1,5 @@
 import { env } from "./env";
+import { escapeHtml } from "./utils";
 
 type ResetUser = { email: string; name?: string | null };
 
@@ -14,6 +15,10 @@ export function queuePasswordResetEmail(user: ResetUser, url: string): void {
       const from = env.RESEND_FROM_EMAIL ?? "Aliko CV <onboarding@resend.dev>";
 
       if (key) {
+        const safeName = user.name ? escapeHtml(user.name) : "";
+        const greeting = safeName ? `Bonjour ${safeName}` : "Bonjour";
+        const safeUrl = escapeHtml(url);
+
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -24,10 +29,11 @@ export function queuePasswordResetEmail(user: ResetUser, url: string): void {
             from,
             to: user.email,
             subject: "Réinitialiser votre mot de passe — Aliko CV",
-            html: `<p>Bonjour${user.name ? ` ${user.name}` : ""},</p>
+            html: `<p>${greeting},</p>
 <p>Pour choisir un nouveau mot de passe, ouvrez ce lien (durée limitée)&nbsp;:</p>
-<p><a href="${url}">${url}</a></p>
+<p><a href="${safeUrl}">${safeUrl}</a></p>
 <p>Si vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email.</p>`,
+            text: `${greeting},\n\nPour choisir un nouveau mot de passe, ouvrez ce lien (durée limitée) :\n${url}\n\nSi vous n'avez pas demandé cette réinitialisation, vous pouvez ignorer cet email.`,
           }),
         });
 
