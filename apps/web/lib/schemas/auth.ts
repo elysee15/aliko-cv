@@ -55,7 +55,12 @@ export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 export const profileSchema = z.strictObject({
   name: z.string().min(1, "Le nom est requis").max(200),
-  image: z.union([z.string().url("URL invalide"), z.literal("")]).optional(),
+  image: z
+    .union([
+      z.url("URL invalide").startsWith("https://", "L'URL doit commencer par https://"),
+      z.literal(""),
+    ])
+    .optional(),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;
@@ -74,6 +79,10 @@ export const changePasswordSchema = z
     currentPassword: z.string().min(1, "Le mot de passe actuel est requis"),
     newPassword: passwordField,
     confirmPassword: z.string().min(1, "Confirmez le mot de passe"),
+  })
+  .refine((data) => data.newPassword !== data.currentPassword, {
+    message: "Le nouveau mot de passe doit être différent de l'actuel",
+    path: ["newPassword"],
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Les mots de passe ne correspondent pas",
