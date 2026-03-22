@@ -4,13 +4,12 @@ globs: **/*.{tsx,jsx}
 ---
 # Form Patterns
 
-All forms in this project use **react-hook-form** with **zodResolver** and the design system's `Field` components. This ensures consistent validation, accessibility (UX-DR10, UX-DR14), and error handling.
+All forms in this project use **`useHookFormAction`** from `@next-safe-action/adapter-react-hook-form` with **zodResolver** and the design system's `Field` components. This combines `useForm` + `useAction` into a single hook, automatically mapping server validation errors to form fields. Ensures consistent validation, accessibility (UX-DR10, UX-DR14), and error handling.
 
 ## 1. Required Stack
 
 ```tsx
-import type { SubmitErrorHandler } from "react-hook-form";
-import { useForm } from "react-hook-form";
+import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hooks";
 import { zodResolver } from "@hookform/resolvers/zod";
 ```
 
@@ -30,7 +29,7 @@ import { Button } from "@workspace/ui/components/button";
 
 ## 2. Schema Convention
 
-Zod schemas live in `apps/web/lib/schemas/*.ts`. Rules:
+Zod schemas live in `apps/web/lib/schemas/*.ts`. The **same schema** is shared between the server action's `.inputSchema()` and the form's `zodResolver()` so client and server validation stay in sync.
 
 - Use `z.strictObject()` for form schemas (rejects unknown properties)
 - Export the inferred type alongside the schema
@@ -50,56 +49,52 @@ export type MyFormInput = z.infer<typeof myFormSchema>;
 
 ## 3. Component Structure
 
-Reference implementation: `apps/web/components/auth/reset-password-form.tsx`
+`useHookFormAction` returns four properties:
+
+| Property | Description |
+|---|---|
+| `form` | Full `UseFormReturn` — `form.register()`, `form.formState.errors`, `form.setFocus()`, etc. |
+| `action` | Full `UseActionHookReturn` — `action.isPending`, `action.result`, `action.hasSucceeded`, etc. |
+| `handleSubmitWithAction` | Pass directly to `<form onSubmit={...}>` — handles client validation then server execution |
+| `resetFormAndAction` | Resets both form fields and action state |
 
 ```tsx
 "use client";
 
-import { useState } from "react";
-import type { SubmitErrorHandler } from "react-hook-form";
-import { useForm } from "react-hook-form";
+import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hooks";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { myAction } from "@/app/actions/my-action";
+import { myFormSchema } from "@/lib/schemas/my-form";
 // ... UI imports ...
-import { myFormSchema, type MyFormInput } from "@/lib/schemas/my-form";
 
 export function MyForm({ defaultName }: { defaultName: string }) {
-  const [globalError, setGlobalError] = useState<string | null>(null);
+  const { form, action, handleSubmitWithAction, resetFormAndAction } =
+    useHookFormAction(myAction, zodResolver(myFormSchema), {
+      formProps: {
+        defaultValues: { name: defaultName, email: "" },
+      },
+      actionProps: {
+        onSuccess: ({ data }) => {
+          toast.success("Enregistré");
+          resetFormAndAction();
+        },
+        onError: ({ error }) => {
+          toast.error(error.serverError ?? "Erreur");
+        },
+      },
+    });
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setFocus,
-  } = useForm<MyFormInput>({
-    resolver: zodResolver(myFormSchema),
-    defaultValues: { name: defaultName, email: "" },
-  });
-
-  // Focus the first field with an error on invalid submit
-  const onInvalid: SubmitErrorHandler<MyFormInput> = (formErrors) => {
-    const order: (keyof MyFormInput)[] = ["name", "email"];
-    const first = order.find((k) => formErrors[k]);
-    if (first) void setFocus(first);
-  };
-
-  async function onSubmit(values: MyFormInput) {
-    setGlobalError(null);
-    try {
-      // ... API call ...
-    } catch {
-      setGlobalError("Erreur réseau. Réessayez.");
-    }
-  }
+  const { errors } = form.formState;
 
   return (
     <form
-      onSubmit={handleSubmit(onSubmit, onInvalid)}
+      onSubmit={handleSubmitWithAction}
       noValidate
       className="flex flex-col gap-4"
     >
-      {globalError ? (
+      {action.result.serverError ? (
         <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {globalError}
+          {action.result.serverError}
         </div>
       ) : null}
 
@@ -114,17 +109,36 @@ export function MyForm({ defaultName }: { defaultName: string }) {
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "my-form-name-error" : undefined}
             className={errors.name ? "border-destructive" : undefined}
-            disabled={isSubmitting}
-            {...register("name")}
+            disabled={action.isPending}
+            {...form.register("name")}
           />
           {errors.name ? (
             <FieldError id="my-form-name-error">{errors.name.message}</FieldError>
           ) : null}
         </Field>
+
+        <Field data-invalid={!!errors.email}>
+          <FieldLabel htmlFor="my-form-email">
+            Email <span className="text-destructive" aria-hidden>*</span>
+          </FieldLabel>
+          <Input
+            id="my-form-email"
+            type="email"
+            aria-required="true"
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? "my-form-email-error" : undefined}
+            className={errors.email ? "border-destructive" : undefined}
+            disabled={action.isPending}
+            {...form.register("email")}
+          />
+          {errors.email ? (
+            <FieldError id="my-form-email-error">{errors.email.message}</FieldError>
+          ) : null}
+        </Field>
       </FieldGroup>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "Envoi…" : "Envoyer"}
+      <Button type="submit" className="w-full min-h-11" disabled={action.isPending}>
+        {action.isPending ? "Envoi…" : "Envoyer"}
       </Button>
     </form>
   );
@@ -143,14 +157,14 @@ Every form field MUST have:
 | `aria-invalid={!!errors.field}` | Announces invalid state | On the `<Input>`, conditional |
 | `aria-describedby="error-id"` | Links input to its error message | Points to `<FieldError id="...">` when error exists |
 | `<FieldError id="...">` | Error message below the field | Conditionally rendered |
-| `disabled={isSubmitting}` | Prevents double-submit | On the `<Input>` and `<Button>` |
+| `disabled={action.isPending}` | Prevents double-submit | On the `<Input>` and `<Button>` |
 
 Every `<form>` MUST have:
 
 | Attribute | Purpose |
 |---|---|
 | `noValidate` | Disables browser validation — Zod handles everything |
-| `onSubmit={handleSubmit(onSubmit, onInvalid)}` | Validation + focus on first error |
+| `onSubmit={handleSubmitWithAction}` | Client validation → server execution with auto-mapped errors |
 
 Every primary/destructive button MUST have:
 
@@ -164,29 +178,37 @@ Two error channels — never mix them:
 
 | Error type | Where | How |
 |---|---|---|
-| **Field validation** (Zod) | Below the field | `<FieldError>` with `errors.field.message` |
-| **API / server errors** | Above the form | `globalError` state with `role="alert"` |
+| **Field validation** (Zod + server) | Below the field | `<FieldError>` with `form.formState.errors.field.message` — includes both client-side and server-side validation errors (auto-mapped by the adapter) |
+| **Server errors** (unexpected) | Above the form or via `onError` callback | `action.result.serverError` with `role="alert"`, or `toast.error()` in `actionProps.onError` |
 
 ```tsx
-// GOOD: Field error below the input
+// GOOD: Field error below the input (covers both client + server validation)
 {errors.email ? (
   <FieldError id="email-error">{errors.email.message}</FieldError>
 ) : null}
 
-// GOOD: Global error above the form
-{globalError ? (
-  <div role="alert" className="...text-destructive">{globalError}</div>
+// GOOD: Server error above the form
+{action.result.serverError ? (
+  <div role="alert" className="...text-destructive">{action.result.serverError}</div>
 ) : null}
+
+// GOOD: Server error via callback (toast for non-field errors)
+actionProps: {
+  onError: ({ error }) => { toast.error(error.serverError ?? "Erreur"); },
+}
 
 // BAD: Using toast for validation errors
 toast.error(errors.email.message); // Never do this
+
+// BAD: Using useState for globalError — use action.result.serverError instead
+const [globalError, setGlobalError] = useState<string | null>(null);
 ```
 
 Use `toast.success()` for success feedback (save confirmed, item created). Never use `toast.error()` for field validation — only for unexpected server errors in non-form contexts.
 
-## 6. When Using `next-safe-action` Instead of `react-hook-form`
+## 6. When `useAction` Alone Is Sufficient
 
-For **single-field forms** (e.g. API key creation), `useAction` from `next-safe-action/hooks` is sufficient — `react-hook-form` is overkill.
+For **single-field forms** (e.g. API key creation), `useAction` from `next-safe-action/hooks` is sufficient — `useHookFormAction` is overkill.
 
 ```tsx
 const action = useAction(createApiKeyAction, {
@@ -220,6 +242,15 @@ Still apply the same accessibility attributes:
 ## 7. Anti-Patterns
 
 ```tsx
+// BAD: Using standalone useForm + manual onSubmit for server actions
+const { register, handleSubmit } = useForm({ resolver: zodResolver(schema) });
+async function onSubmit(values) { await myAction(values); }
+<form onSubmit={handleSubmit(onSubmit)}>
+
+// GOOD: useHookFormAction combines useForm + useAction and auto-maps server errors
+const { form, action, handleSubmitWithAction } = useHookFormAction(myAction, zodResolver(schema), { ... });
+<form onSubmit={handleSubmitWithAction}>
+
 // BAD: Raw FormData without Zod validation
 async function onSubmit(e: FormEvent) {
   const fd = new FormData(e.target);
@@ -227,19 +258,24 @@ async function onSubmit(e: FormEvent) {
 }
 
 // BAD: Missing noValidate — browser popups conflict with FieldError
-<form onSubmit={handleSubmit(onSubmit)}>
+<form onSubmit={handleSubmitWithAction}>
 
-// BAD: Using useState for individual field errors
+// GOOD: Always add noValidate
+<form onSubmit={handleSubmitWithAction} noValidate>
+
+// BAD: Using useState for globalError or individual field errors
+const [globalError, setGlobalError] = useState("");
 const [emailError, setEmailError] = useState("");
 
-// BAD: Missing onInvalid — no focus management on validation failure
-<form onSubmit={handleSubmit(onSubmit)}>
+// GOOD: Server errors from action.result, field errors from form.formState.errors
+{action.result.serverError && <div role="alert">{action.result.serverError}</div>}
+{form.formState.errors.email && <FieldError>{form.formState.errors.email.message}</FieldError>}
 
 // BAD: Shared isPending across multiple actions
 const [isPending, startTransition] = useTransition();
 
-// GOOD: Each useAction has its own isExecuting
-const createAction = useAction(createAction, { ... });
+// GOOD: Each useHookFormAction/useAction has its own action.isPending
+const createForm = useHookFormAction(createAction, zodResolver(schema), { ... });
 const deleteAction = useAction(deleteAction, { ... });
 ```
 
@@ -254,7 +290,7 @@ Use `<FieldDescription>` for input hints (password rules, format expectations). 
       ? "password-error password-hint"
       : "password-hint"
   }
-  {...register("password")}
+  {...form.register("password")}
 />
 <FieldDescription id="password-hint">
   Au moins 8 caractères, une majuscule, une minuscule et un chiffre.

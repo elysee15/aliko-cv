@@ -13,20 +13,53 @@ export const createResumeSchema = z.object({
 
 export type CreateResumeInput = z.infer<typeof createResumeSchema>;
 
-export const templateTypes = ["classic", "modern", "minimal"] as const;
+export const templateTypes = [
+  "classic",
+  "modern",
+  "minimal",
+  "executive",
+  "creative",
+  "compact",
+] as const;
 export type TemplateType = (typeof templateTypes)[number];
 
 export const templateLabels: Record<TemplateType, string> = {
   classic: "Classique",
   modern: "Moderne",
   minimal: "Minimaliste",
+  executive: "Exécutif",
+  creative: "Créatif",
+  compact: "Compact",
 };
 
 export const templateDescriptions: Record<TemplateType, string> = {
   classic: "En-tête centré, sections bordées — professionnel et lisible.",
   modern: "Mise en page avec accent coloré et typographie moderne.",
   minimal: "Épuré et aéré, laisse le contenu respirer.",
+  executive: "Deux colonnes avec barre latérale — idéal pour les cadres.",
+  creative: "En-tête dégradé, sections en cartes — audacieux et unique.",
+  compact: "Dense et optimisé ATS — maximum de contenu par page.",
 };
+
+export const accentColors = [
+  { value: "#6366f1", label: "Indigo" },
+  { value: "#0ea5e9", label: "Bleu ciel" },
+  { value: "#10b981", label: "Émeraude" },
+  { value: "#f59e0b", label: "Ambre" },
+  { value: "#ef4444", label: "Rouge" },
+  { value: "#8b5cf6", label: "Violet" },
+  { value: "#ec4899", label: "Rose" },
+  { value: "#64748b", label: "Ardoise" },
+  { value: "#171717", label: "Noir" },
+] as const;
+
+export const fontFamilies = [
+  { value: "inter", label: "Inter", description: "Sans-serif moderne" },
+  { value: "merriweather", label: "Merriweather", description: "Serif élégant" },
+  { value: "jetbrains-mono", label: "JetBrains Mono", description: "Monospace développeur" },
+] as const;
+
+export type FontFamily = (typeof fontFamilies)[number]["value"];
 
 export const updateResumeSchema = z.object({
   title: z
@@ -47,6 +80,13 @@ export const updateResumeSchema = z.object({
   github: z.string().max(200).nullable().optional(),
   status: z.enum(["draft", "published"]).optional(),
   template: z.enum(templateTypes).optional(),
+  accentColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Couleur hexadécimale invalide")
+    .optional(),
+  fontFamily: z
+    .enum(["inter", "merriweather", "jetbrains-mono"])
+    .optional(),
 });
 
 export type UpdateResumeInput = z.infer<typeof updateResumeSchema>;

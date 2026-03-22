@@ -94,7 +94,10 @@ export function MinimalTemplate({ resume }: TemplateProps) {
       </div>
 
       {resume.summary && (
-        <p className="border-l-2 border-muted-foreground/20 pl-4 text-sm leading-relaxed">
+        <p
+          className="border-l-2 pl-4 text-sm leading-relaxed"
+          style={{ borderColor: "color-mix(in srgb, var(--resume-accent) 30%, transparent)" }}
+        >
           {resume.summary}
         </p>
       )}

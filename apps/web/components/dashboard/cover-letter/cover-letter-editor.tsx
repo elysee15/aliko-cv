@@ -1,14 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import {
   ArrowLeftIcon,
-  SaveIcon,
-  Loader2Icon,
   PrinterIcon,
   TrashIcon,
+  AlertTriangleIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -17,7 +16,15 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
-import { Badge } from "@workspace/ui/components/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@workspace/ui/components/dialog";
 import {
   Select,
   SelectContent,
@@ -30,6 +37,8 @@ import {
   updateCoverLetterAction,
   deleteCoverLetterAction,
 } from "@/app/actions/cover-letters";
+import { useAutosave } from "@/hooks/use-autosave";
+import { AutosaveIndicator } from "@/components/autosave-indicator";
 import { extractActionError } from "@/lib/action-error";
 
 type CoverLetterData = {
@@ -54,8 +63,6 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
   const [jobTitle, setJobTitle] = useState(letter.jobTitle ?? "");
   const [resumeId, setResumeId] = useState(letter.resumeId ?? "");
   const [content, setContent] = useState(letter.content);
-  const [saving, setSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const deleteAction = useAction(deleteCoverLetterAction, {
     onSuccess: () => {
@@ -65,42 +72,33 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
     onError: ({ error }) => toast.error(extractActionError(error)),
   });
 
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const save = useCallback(async () => {
-    setSaving(true);
-    const result = await updateCoverLetterAction({
-      id: letter.id,
+  const autosaveData = useMemo(
+    () => ({
       title,
       company: company || null,
       jobTitle: jobTitle || null,
       resumeId: resumeId || null,
       content,
-    });
-    if (result?.data) {
-      setLastSaved(new Date());
-    } else if (result?.serverError) {
-      toast.error(result.serverError);
-    } else if (result?.validationErrors) {
-      toast.error("Données invalides.");
-    }
-    setSaving(false);
-  }, [letter.id, title, company, jobTitle, resumeId, content]);
+    }),
+    [title, company, jobTitle, resumeId, content],
+  );
 
-  useEffect(() => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    autosaveTimer.current = setTimeout(() => {
-      save();
-    }, 1500);
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-  }, [title, company, jobTitle, resumeId, content, save]);
+  const handleAutoSave = useCallback(
+    async (data: typeof autosaveData) => {
+      if (!data.title.trim()) return { success: false };
+      const result = await updateCoverLetterAction({ id: letter.id, ...data });
+      if (result?.serverError) toast.error(result.serverError);
+      return { success: !!result?.data };
+    },
+    [letter.id],
+  );
 
-  function handleDelete() {
-    if (!confirm("Supprimer cette lettre de motivation ?")) return;
-    deleteAction.execute({ id: letter.id });
-  }
+  const { status: saveStatus } = useAutosave({
+    data: autosaveData,
+    onSave: handleAutoSave,
+    delay: 1500,
+    enabled: title.trim().length > 0,
+  });
 
   return (
     <div className="min-h-svh">
@@ -113,18 +111,10 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold line-clamp-1">{title}</h1>
-            {lastSaved && (
-              <Badge variant="secondary" className="shrink-0 text-xs">
-                Sauvegardé
-              </Badge>
-            )}
+            <AutosaveIndicator status={saveStatus} />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={save} disabled={saving}>
-            {saving ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
-            Sauver
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -133,15 +123,43 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
             <PrinterIcon />
             PDF
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            disabled={deleteAction.isExecuting}
-            className="text-destructive hover:text-destructive"
-          >
-            <TrashIcon />
-          </Button>
+          <Dialog>
+            <DialogTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={deleteAction.isExecuting}
+                  className="text-destructive hover:text-destructive"
+                />
+              }
+            >
+              <TrashIcon />
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-destructive">
+                  <AlertTriangleIcon className="size-5" />
+                  Supprimer la lettre
+                </DialogTitle>
+                <DialogDescription>
+                  Cette action est irréversible. La lettre de motivation sera
+                  définitivement supprimée.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="destructive"
+                  disabled={deleteAction.isExecuting}
+                  onClick={() => deleteAction.execute({ id: letter.id })}
+                >
+                  {deleteAction.isExecuting
+                    ? "Suppression…"
+                    : "Supprimer définitivement"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

@@ -55,10 +55,6 @@ export function CreateCoverLetterDialog({ resumes = [] }: Props) {
   });
 
   function handleCreate() {
-    if (!title.trim()) {
-      toast.error("Le titre est requis.");
-      return;
-    }
     execute({
       title: title.trim(),
       company: company.trim() || null,

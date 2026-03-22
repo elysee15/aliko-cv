@@ -12,7 +12,7 @@ export class ActionError extends Error {
 
 export const actionClient = createSafeActionClient({
   handleServerError(e) {
-    console.error("Action error:", e.message);
+    console.error("Action error:", e);
     if (e instanceof ActionError) return e.message;
     return "Une erreur est survenue.";
   },

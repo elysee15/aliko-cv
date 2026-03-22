@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { db } from "@aliko-cv/db/client";
-import { createResume, createSection, createEntry } from "@aliko-cv/db/queries";
+import { createResume } from "@aliko-cv/db/queries";
+import { resumeSection, resumeEntry } from "@aliko-cv/db/schema";
 
 import { auth } from "@/lib/auth";
 import { parseLinkedInZip } from "@/lib/linkedin/parser";
@@ -66,19 +67,23 @@ export async function POST(request: Request) {
       summary: summary ?? undefined,
     });
 
-    for (const { section, entries } of sections) {
-      const created = await createSection(db, {
-        ...section,
-        resumeId: resume!.id,
-      });
+    await db.transaction(async (tx) => {
+      for (const { section, entries } of sections) {
+        const [created] = await tx
+          .insert(resumeSection)
+          .values({ ...section, resumeId: resume!.id })
+          .returning({ id: resumeSection.id });
 
-      for (const entry of entries) {
-        await createEntry(db, {
-          ...entry,
-          sectionId: created!.id,
-        });
+        if (entries.length > 0) {
+          await tx.insert(resumeEntry).values(
+            entries.map((entry) => ({
+              ...entry,
+              sectionId: created!.id,
+            })),
+          );
+        }
       }
-    }
+    });
 
     const stats = {
       positions: linkedInData.positions.length,

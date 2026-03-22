@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { SubmitErrorHandler } from "react-hook-form";
+import { useWatch } from "react-hook-form";
+import { useHookFormAction } from "@next-safe-action/adapter-react-hook-form/hooks";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAction } from "next-safe-action/hooks";
 import { PlusIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +13,12 @@ import { toast } from "sonner";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { Field, FieldLabel } from "@workspace/ui/components/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
 import {
   Select,
   SelectContent,
@@ -33,6 +42,10 @@ import {
   deleteApplicationAction,
 } from "@/app/actions/applications";
 import { extractActionError } from "@/lib/action-error";
+import {
+  createApplicationSchema,
+  type CreateApplicationInput,
+} from "@/lib/schemas/applications";
 
 type ApplicationData = {
   id: string;
@@ -55,6 +68,17 @@ type Props = {
   triggerHidden?: boolean;
 };
 
+const DEFAULT_VALUES: CreateApplicationInput = {
+  company: "",
+  jobTitle: "",
+  jobUrl: "",
+  status: "wishlist",
+  appliedAt: "",
+  notes: "",
+  resumeId: "",
+  coverLetterId: "",
+};
+
 export function ApplicationDialog({
   resumes = [],
   coverLetters = [],
@@ -70,24 +94,38 @@ export function ApplicationDialog({
   const open = controlledOpen ?? internalOpen;
   const setOpen = controlledOnOpenChange ?? setInternalOpen;
 
-  const [company, setCompany] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [jobUrl, setJobUrl] = useState("");
-  const [status, setStatus] = useState<ApplicationStatus>("wishlist");
-  const [appliedAt, setAppliedAt] = useState("");
-  const [notes, setNotes] = useState("");
-  const [resumeId, setResumeId] = useState("");
-  const [coverLetterId, setCoverLetterId] = useState("");
+  const { form, action: createAction, resetFormAndAction } =
+    useHookFormAction(
+      createApplicationAction,
+      zodResolver(createApplicationSchema),
+      {
+        formProps: { defaultValues: DEFAULT_VALUES },
+        actionProps: {
+          onSuccess: () => {
+            toast.success("Candidature créée !");
+            setOpen(false);
+            resetFormAndAction();
+            router.refresh();
+          },
+          onError: ({ error }) => toast.error(extractActionError(error)),
+        },
+      },
+    );
 
-  const createAction = useAction(createApplicationAction, {
-    onSuccess: () => {
-      toast.success("Candidature créée !");
-      setOpen(false);
-      resetForm();
-      router.refresh();
-    },
-    onError: ({ error }) => toast.error(extractActionError(error)),
-  });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    control,
+    reset,
+    setFocus,
+  } = form;
+
+  const status = useWatch({ control, name: "status" });
+  const appliedAt = useWatch({ control, name: "appliedAt" });
+  const resumeId = useWatch({ control, name: "resumeId" });
+  const coverLetterId = useWatch({ control, name: "coverLetterId" });
 
   const updateAction = useAction(updateApplicationAction, {
     onSuccess: () => {
@@ -114,55 +152,63 @@ export function ApplicationDialog({
 
   useEffect(() => {
     if (open && editData) {
-      setCompany(editData.company);
-      setJobTitle(editData.jobTitle);
-      setJobUrl(editData.jobUrl ?? "");
-      setStatus(editData.status);
-      setAppliedAt(editData.appliedAt ?? "");
-      setNotes(editData.notes ?? "");
-      setResumeId(editData.resumeId ?? "");
-      setCoverLetterId(editData.coverLetterId ?? "");
+      reset({
+        company: editData.company,
+        jobTitle: editData.jobTitle,
+        jobUrl: editData.jobUrl ?? "",
+        status: editData.status,
+        appliedAt: editData.appliedAt ?? "",
+        notes: editData.notes ?? "",
+        resumeId: editData.resumeId ?? "",
+        coverLetterId: editData.coverLetterId ?? "",
+      });
     } else if (open && !editData) {
-      resetForm();
+      resetFormAndAction();
     }
-  }, [open, editData]);
+  }, [open, editData, reset, resetFormAndAction]);
 
-  function resetForm() {
-    setCompany("");
-    setJobTitle("");
-    setJobUrl("");
-    setStatus("wishlist");
-    setAppliedAt("");
-    setNotes("");
-    setResumeId("");
-    setCoverLetterId("");
-  }
+  const onInvalid: SubmitErrorHandler<CreateApplicationInput> = (
+    formErrors,
+  ) => {
+    const order: (keyof CreateApplicationInput)[] = [
+      "company",
+      "jobTitle",
+      "jobUrl",
+      "notes",
+    ];
+    const first = order.find((k) => formErrors[k]);
+    if (first) void setFocus(first);
+  };
 
-  function handleSubmit() {
-    if (!company.trim()) {
-      toast.error("L'entreprise est requise.");
-      return;
-    }
-    if (!jobTitle.trim()) {
-      toast.error("Le poste est requis.");
-      return;
-    }
-
+  function onSubmit(values: CreateApplicationInput) {
     const payload = {
-      company: company.trim(),
-      jobTitle: jobTitle.trim(),
-      jobUrl: jobUrl.trim() || null,
-      status,
-      appliedAt: appliedAt || null,
-      notes: notes.trim() || null,
-      resumeId: resumeId || null,
-      coverLetterId: coverLetterId || null,
+      company: values.company,
+      jobTitle: values.jobTitle,
+      jobUrl:
+        typeof values.jobUrl === "string" && values.jobUrl.trim()
+          ? values.jobUrl.trim()
+          : null,
+      status: values.status,
+      appliedAt: values.appliedAt || null,
+      notes:
+        typeof values.notes === "string" && values.notes.trim()
+          ? values.notes.trim()
+          : null,
+      resumeId: values.resumeId || null,
+      coverLetterId: values.coverLetterId || null,
     };
 
     if (isEdit) {
       updateAction.execute({ id: editData.id, ...payload });
     } else {
       createAction.execute(payload);
+    }
+  }
+
+  function handleStatusChange(newStatus: ApplicationStatus) {
+    setValue("status", newStatus);
+    if (newStatus !== "wishlist" && newStatus !== "archived" && !appliedAt) {
+      setValue("appliedAt", new Date().toISOString().slice(0, 10));
     }
   }
 
@@ -189,32 +235,88 @@ export function ApplicationDialog({
             {isEdit ? "Modifier la candidature" : "Nouvelle candidature"}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <Field>
-            <FieldLabel>Entreprise *</FieldLabel>
-            <Input
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder="Ex : Google"
-            />
-          </Field>
-          <Field>
-            <FieldLabel>Poste *</FieldLabel>
-            <Input
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              placeholder="Ex : Développeur Full-Stack"
-            />
-          </Field>
-          <Field>
-            <FieldLabel>URL de l'offre</FieldLabel>
-            <Input
-              type="url"
-              value={jobUrl}
-              onChange={(e) => setJobUrl(e.target.value)}
-              placeholder="https://..."
-            />
-          </Field>
+        <form
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          noValidate
+          className="space-y-3"
+        >
+          <FieldGroup>
+            <Field data-invalid={!!errors.company}>
+              <FieldLabel htmlFor="app-company">
+                Entreprise{" "}
+                <span className="text-destructive" aria-hidden>
+                  *
+                </span>
+              </FieldLabel>
+              <Input
+                id="app-company"
+                placeholder="Ex : Google"
+                aria-required="true"
+                aria-invalid={!!errors.company}
+                aria-describedby={
+                  errors.company ? "app-company-error" : undefined
+                }
+                className={errors.company ? "border-destructive" : undefined}
+                disabled={loading}
+                {...register("company")}
+              />
+              {errors.company ? (
+                <FieldError id="app-company-error">
+                  {errors.company.message}
+                </FieldError>
+              ) : null}
+            </Field>
+
+            <Field data-invalid={!!errors.jobTitle}>
+              <FieldLabel htmlFor="app-jobTitle">
+                Poste{" "}
+                <span className="text-destructive" aria-hidden>
+                  *
+                </span>
+              </FieldLabel>
+              <Input
+                id="app-jobTitle"
+                placeholder="Ex : Développeur Full-Stack"
+                aria-required="true"
+                aria-invalid={!!errors.jobTitle}
+                aria-describedby={
+                  errors.jobTitle ? "app-jobTitle-error" : undefined
+                }
+                className={errors.jobTitle ? "border-destructive" : undefined}
+                disabled={loading}
+                {...register("jobTitle")}
+              />
+              {errors.jobTitle ? (
+                <FieldError id="app-jobTitle-error">
+                  {errors.jobTitle.message}
+                </FieldError>
+              ) : null}
+            </Field>
+
+            <Field data-invalid={!!errors.jobUrl}>
+              <FieldLabel htmlFor="app-jobUrl">
+                URL de l&apos;offre
+              </FieldLabel>
+              <Input
+                id="app-jobUrl"
+                type="url"
+                placeholder="https://..."
+                aria-invalid={!!errors.jobUrl || undefined}
+                aria-describedby={
+                  errors.jobUrl ? "app-jobUrl-error" : undefined
+                }
+                className={errors.jobUrl ? "border-destructive" : undefined}
+                disabled={loading}
+                {...register("jobUrl")}
+              />
+              {errors.jobUrl ? (
+                <FieldError id="app-jobUrl-error">
+                  {errors.jobUrl.message}
+                </FieldError>
+              ) : null}
+            </Field>
+          </FieldGroup>
+
           <Field>
             <FieldLabel>Statut</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
@@ -222,16 +324,7 @@ export function ApplicationDialog({
                 <button
                   key={s.value}
                   type="button"
-                  onClick={() => {
-                    setStatus(s.value);
-                    if (
-                      s.value !== "wishlist" &&
-                      s.value !== "archived" &&
-                      !appliedAt
-                    ) {
-                      setAppliedAt(new Date().toISOString().slice(0, 10));
-                    }
-                  }}
+                  onClick={() => handleStatusChange(s.value)}
                   className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
                     status === s.value
                       ? `${s.bgClass} ring-2 ring-offset-1 ring-current/30`
@@ -243,20 +336,27 @@ export function ApplicationDialog({
               ))}
             </div>
           </Field>
+
           <Field>
-            <FieldLabel>Date de candidature</FieldLabel>
+            <FieldLabel htmlFor="app-appliedAt">
+              Date de candidature
+            </FieldLabel>
             <Input
+              id="app-appliedAt"
               type="date"
-              value={appliedAt}
-              onChange={(e) => setAppliedAt(e.target.value)}
+              disabled={loading}
+              {...register("appliedAt")}
             />
           </Field>
+
           {resumes.length > 0 && (
             <Field>
               <FieldLabel>CV associé</FieldLabel>
               <Select
                 value={resumeId || "none"}
-                onValueChange={(val) => setResumeId(!val || val === "none" ? "" : val)}
+                onValueChange={(val) =>
+                  setValue("resumeId", !val || val === "none" ? "" : val)
+                }
                 items={[
                   { value: "none", label: "Aucun" },
                   ...resumes.map((r) => ({ value: r.id, label: r.title })),
@@ -276,15 +376,24 @@ export function ApplicationDialog({
               </Select>
             </Field>
           )}
+
           {coverLetters.length > 0 && (
             <Field>
               <FieldLabel>Lettre de motivation</FieldLabel>
               <Select
                 value={coverLetterId || "none"}
-                onValueChange={(val) => setCoverLetterId(!val || val === "none" ? "" : val)}
+                onValueChange={(val) =>
+                  setValue(
+                    "coverLetterId",
+                    !val || val === "none" ? "" : val,
+                  )
+                }
                 items={[
                   { value: "none", label: "Aucune" },
-                  ...coverLetters.map((cl) => ({ value: cl.id, label: cl.title })),
+                  ...coverLetters.map((cl) => ({
+                    value: cl.id,
+                    label: cl.title,
+                  })),
                 ]}
               >
                 <SelectTrigger className="w-full">
@@ -301,22 +410,28 @@ export function ApplicationDialog({
               </Select>
             </Field>
           )}
-          <Field>
-            <FieldLabel>Notes</FieldLabel>
+
+          <Field data-invalid={!!errors.notes}>
+            <FieldLabel htmlFor="app-notes">Notes</FieldLabel>
             <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              id="app-notes"
               placeholder="Contact, remarques, suivi…"
               rows={3}
-              className="resize-none text-xs"
+              className={`resize-none text-xs ${errors.notes ? "border-destructive" : ""}`}
+              aria-invalid={!!errors.notes || undefined}
+              aria-describedby={errors.notes ? "app-notes-error" : undefined}
+              disabled={loading}
+              {...register("notes")}
             />
+            {errors.notes ? (
+              <FieldError id="app-notes-error">
+                {errors.notes.message}
+              </FieldError>
+            ) : null}
           </Field>
+
           <div className="flex gap-2">
-            <Button
-              onClick={handleSubmit}
-              disabled={loading || !company.trim() || !jobTitle.trim()}
-              className="flex-1"
-            >
+            <Button type="submit" disabled={loading} className="flex-1">
               {loading ? (
                 <>
                   <Loader2Icon className="animate-spin" />
@@ -330,6 +445,7 @@ export function ApplicationDialog({
             </Button>
             {isEdit && (
               <Button
+                type="button"
                 variant="outline"
                 onClick={handleDelete}
                 disabled={loading}
@@ -339,7 +455,7 @@ export function ApplicationDialog({
               </Button>
             )}
           </div>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

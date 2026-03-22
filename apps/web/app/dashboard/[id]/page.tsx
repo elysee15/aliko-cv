@@ -91,7 +91,12 @@ export default async function ResumeEditorPage({
         status={resume.status}
       />
 
-      <TemplateSelector resumeId={resume.id} currentTemplate={template} />
+      <TemplateSelector
+        resumeId={resume.id}
+        currentTemplate={template}
+        currentAccentColor={resume.accentColor}
+        currentFontFamily={resume.fontFamily}
+      />
 
       <SectionList
         resumeId={resume.id}
@@ -119,6 +124,8 @@ export default async function ResumeEditorPage({
             linkedin: resume.linkedin,
             github: resume.github,
           },
+          accentColor: resume.accentColor,
+          fontFamily: resume.fontFamily,
         }}
       />
     </div>

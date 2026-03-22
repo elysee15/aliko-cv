@@ -9,10 +9,18 @@ const applicationStatusValues = [
   "archived",
 ] as const;
 
+const optionalUrl = z
+  .string()
+  .url("URL invalide")
+  .max(500)
+  .or(z.literal(""))
+  .nullable()
+  .optional();
+
 export const createApplicationSchema = z.object({
   company: z.string().min(1, "L'entreprise est requise").max(200),
   jobTitle: z.string().min(1, "Le poste est requis").max(200),
-  jobUrl: z.string().url("URL invalide").max(500).nullable().optional(),
+  jobUrl: optionalUrl,
   status: z.enum(applicationStatusValues).optional(),
   appliedAt: z.string().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
@@ -26,7 +34,7 @@ export const updateApplicationSchema = z.object({
   id: z.string().min(1),
   company: z.string().min(1).max(200).optional(),
   jobTitle: z.string().min(1).max(200).optional(),
-  jobUrl: z.string().url("URL invalide").max(500).nullable().optional(),
+  jobUrl: optionalUrl,
   status: z.enum(applicationStatusValues).optional(),
   appliedAt: z.string().nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),

@@ -70,6 +70,8 @@ export default async function ResumePreviewPage({
               linkedin: resume.linkedin,
               github: resume.github,
             },
+            accentColor: resume.accentColor,
+            fontFamily: resume.fontFamily,
           }}
         />
       </div>

@@ -78,13 +78,15 @@ export const updateResumeAction = authClient
       ...data,
     });
 
-    const event =
-      data.status === "published" ? "resume.published" : "resume.updated";
-    dispatchWebhook(ctx.user.id, event, {
-      resumeId: id,
-      ...(data.title && { title: data.title }),
-      ...(data.status && { status: data.status }),
-    });
+    if (resume) {
+      const event =
+        data.status === "published" ? "resume.published" : "resume.updated";
+      dispatchWebhook(ctx.user.id, event, {
+        resumeId: id,
+        ...(data.title && { title: data.title }),
+        ...(data.status && { status: data.status }),
+      });
+    }
 
     revalidatePath("/dashboard");
     revalidatePath(`/dashboard/${id}`);
@@ -134,8 +136,14 @@ export const reorderSectionsAction = authClient
       ),
     }),
   )
-  .action(async ({ parsedInput }) => {
-    await reorderSections(db, parsedInput.items);
+  .action(async ({ parsedInput, ctx }) => {
+    const ok = await reorderSections(
+      db,
+      ctx.user.id,
+      parsedInput.resumeId,
+      parsedInput.items,
+    );
+    if (!ok) throw new ActionError("CV introuvable.");
     revalidatePath(`/dashboard/${parsedInput.resumeId}`);
     return null;
   });
@@ -149,8 +157,14 @@ export const reorderEntriesAction = authClient
       ),
     }),
   )
-  .action(async ({ parsedInput }) => {
-    await reorderEntries(db, parsedInput.items);
+  .action(async ({ parsedInput, ctx }) => {
+    const ok = await reorderEntries(
+      db,
+      ctx.user.id,
+      parsedInput.resumeId,
+      parsedInput.items,
+    );
+    if (!ok) throw new ActionError("CV introuvable.");
     revalidatePath(`/dashboard/${parsedInput.resumeId}`);
     return null;
   });
@@ -161,8 +175,9 @@ export const reorderEntriesAction = authClient
 
 export const createSectionAction = authClient
   .inputSchema(createSectionSchema)
-  .action(async ({ parsedInput }) => {
-    const section = await createSection(db, parsedInput);
+  .action(async ({ parsedInput, ctx }) => {
+    const section = await createSection(db, ctx.user.id, parsedInput);
+    if (!section) throw new ActionError("CV introuvable.");
     revalidatePath(`/dashboard/${parsedInput.resumeId}`);
     return section;
   });
@@ -175,9 +190,10 @@ export const updateSectionAction = authClient
       ...updateSectionSchema.shape,
     }),
   )
-  .action(async ({ parsedInput }) => {
+  .action(async ({ parsedInput, ctx }) => {
     const { id, resumeId, ...data } = parsedInput;
-    const section = await updateSection(db, { id, ...data });
+    const section = await updateSection(db, ctx.user.id, { id, ...data });
+    if (!section) throw new ActionError("Section introuvable.");
     revalidatePath(`/dashboard/${resumeId}`);
     return section;
   });
@@ -186,8 +202,8 @@ export const deleteSectionAction = authClient
   .inputSchema(
     z.object({ id: z.string().min(1), resumeId: z.string().min(1) }),
   )
-  .action(async ({ parsedInput }) => {
-    const section = await deleteSection(db, parsedInput.id);
+  .action(async ({ parsedInput, ctx }) => {
+    const section = await deleteSection(db, parsedInput.id, ctx.user.id);
     if (!section) throw new ActionError("Section introuvable.");
     revalidatePath(`/dashboard/${parsedInput.resumeId}`);
     return section;
@@ -201,9 +217,10 @@ export const createEntryAction = authClient
   .inputSchema(
     z.object({ resumeId: z.string().min(1), ...createEntrySchema.shape }),
   )
-  .action(async ({ parsedInput }) => {
+  .action(async ({ parsedInput, ctx }) => {
     const { resumeId, ...data } = parsedInput;
-    const entry = await createEntry(db, data);
+    const entry = await createEntry(db, ctx.user.id, data);
+    if (!entry) throw new ActionError("Section introuvable.");
     revalidatePath(`/dashboard/${resumeId}`);
     return entry;
   });
@@ -216,9 +233,10 @@ export const updateEntryAction = authClient
       ...updateEntrySchema.shape,
     }),
   )
-  .action(async ({ parsedInput }) => {
+  .action(async ({ parsedInput, ctx }) => {
     const { id, resumeId, ...data } = parsedInput;
-    const entry = await updateEntry(db, { id, ...data });
+    const entry = await updateEntry(db, ctx.user.id, { id, ...data });
+    if (!entry) throw new ActionError("Entrée introuvable.");
     revalidatePath(`/dashboard/${resumeId}`);
     return entry;
   });
@@ -227,8 +245,8 @@ export const deleteEntryAction = authClient
   .inputSchema(
     z.object({ id: z.string().min(1), resumeId: z.string().min(1) }),
   )
-  .action(async ({ parsedInput }) => {
-    const entry = await deleteEntry(db, parsedInput.id);
+  .action(async ({ parsedInput, ctx }) => {
+    const entry = await deleteEntry(db, parsedInput.id, ctx.user.id);
     if (!entry) throw new ActionError("Entrée introuvable.");
     revalidatePath(`/dashboard/${parsedInput.resumeId}`);
     return entry;

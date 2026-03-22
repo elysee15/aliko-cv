@@ -62,14 +62,6 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
   }
 
   function handleSubmit() {
-    if (!company.trim()) {
-      toast.error("L'entreprise est requise.");
-      return;
-    }
-    if (!jobTitle.trim()) {
-      toast.error("Le poste est requis.");
-      return;
-    }
     execute({
       company: company.trim(),
       jobTitle: jobTitle.trim(),
