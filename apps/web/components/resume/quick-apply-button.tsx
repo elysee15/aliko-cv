@@ -114,7 +114,7 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
             />
           </Field>
           <Field>
-            <FieldLabel>URL de l'offre</FieldLabel>
+            <FieldLabel>URL de l&apos;offre</FieldLabel>
             <Input
               type="url"
               value={jobUrl}
