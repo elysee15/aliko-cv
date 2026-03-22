@@ -31,14 +31,14 @@ export function initAuth(options: {
     user: {
       changeEmail: {
         enabled: true,
-        sendChangeEmailConfirmation: async (data) => {
-          queueChangeEmailVerification(data.user, data.newEmail, data.url);
+        sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+          queueChangeEmailVerification(user, newEmail, url);
         },
       },
     },
     emailVerification: {
-      sendVerificationEmail: async (data) => {
-        queueEmailVerification(data.user, data.url);
+      sendVerificationEmail: async ({ user, url }) => {
+        queueEmailVerification(user, url);
       },
     },
   });
