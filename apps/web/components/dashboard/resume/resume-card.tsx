@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
 import Link from "next/link";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import {
   MoreHorizontalIcon,
@@ -30,6 +30,7 @@ import {
   deleteResumeAction,
   duplicateResumeAction,
 } from "@/app/actions/resume";
+import { extractActionError } from "@/lib/action-error";
 
 type ResumeCardProps = {
   id: string;
@@ -54,29 +55,17 @@ function formatRelativeDate(date: Date): string {
 }
 
 export function ResumeCard({ id, title, status, updatedAt }: ResumeCardProps) {
-  const [isPending, startTransition] = useTransition();
+  const deleteAction = useAction(deleteResumeAction, {
+    onSuccess: () => toast.success("CV supprimé."),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
-  function handleDelete() {
-    startTransition(async () => {
-      const result = await deleteResumeAction(id);
-      if (result.success) {
-        toast.success("CV supprimé.");
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
+  const duplicateAction = useAction(duplicateResumeAction, {
+    onSuccess: () => toast.success("CV dupliqué !"),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
-  function handleDuplicate() {
-    startTransition(async () => {
-      const result = await duplicateResumeAction(id);
-      if (result.success) {
-        toast.success("CV dupliqué !");
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
+  const isPending = deleteAction.isExecuting || duplicateAction.isExecuting;
 
   return (
     <Link href={`/dashboard/${id}`} className="block">
@@ -108,13 +97,15 @@ export function ResumeCard({ id, title, status, updatedAt }: ResumeCardProps) {
                   <span className="sr-only">Actions</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleDuplicate}>
+                  <DropdownMenuItem
+                    onClick={() => duplicateAction.execute({ id })}
+                  >
                     <CopyIcon />
                     Dupliquer
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={handleDelete}
+                    onClick={() => deleteAction.execute({ id })}
                   >
                     <TrashIcon />
                     Supprimer

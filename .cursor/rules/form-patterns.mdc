@@ -1,0 +1,265 @@
+---
+description: Form patterns for this project — react-hook-form + zodResolver + Field components + ARIA accessibility. Apply when creating or modifying any form component.
+globs: **/*.{tsx,jsx}
+---
+# Form Patterns
+
+All forms in this project use **react-hook-form** with **zodResolver** and the design system's `Field` components. This ensures consistent validation, accessibility (UX-DR10, UX-DR14), and error handling.
+
+## 1. Required Stack
+
+```tsx
+import type { SubmitErrorHandler } from "react-hook-form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+```
+
+Field components from the design system:
+
+```tsx
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field";
+import { Input } from "@workspace/ui/components/input";
+import { Button } from "@workspace/ui/components/button";
+```
+
+## 2. Schema Convention
+
+Zod schemas live in `apps/web/lib/schemas/*.ts`. Rules:
+
+- Use `z.strictObject()` for form schemas (rejects unknown properties)
+- Export the inferred type alongside the schema
+- Use `.refine()` for cross-field validation (e.g. password confirmation) with `path` targeting the error field
+- Validation messages in French
+
+```ts
+import { z } from "zod";
+
+export const myFormSchema = z.strictObject({
+  name: z.string().min(1, "Le nom est requis").max(200),
+  email: z.string().min(1, "L'email est requis").email("Format d'email invalide"),
+});
+
+export type MyFormInput = z.infer<typeof myFormSchema>;
+```
+
+## 3. Component Structure
+
+Reference implementation: `apps/web/components/auth/reset-password-form.tsx`
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import type { SubmitErrorHandler } from "react-hook-form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+// ... UI imports ...
+import { myFormSchema, type MyFormInput } from "@/lib/schemas/my-form";
+
+export function MyForm({ defaultName }: { defaultName: string }) {
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setFocus,
+  } = useForm<MyFormInput>({
+    resolver: zodResolver(myFormSchema),
+    defaultValues: { name: defaultName, email: "" },
+  });
+
+  // Focus the first field with an error on invalid submit
+  const onInvalid: SubmitErrorHandler<MyFormInput> = (formErrors) => {
+    const order: (keyof MyFormInput)[] = ["name", "email"];
+    const first = order.find((k) => formErrors[k]);
+    if (first) void setFocus(first);
+  };
+
+  async function onSubmit(values: MyFormInput) {
+    setGlobalError(null);
+    try {
+      // ... API call ...
+    } catch {
+      setGlobalError("Erreur réseau. Réessayez.");
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit(onSubmit, onInvalid)}
+      noValidate
+      className="flex flex-col gap-4"
+    >
+      {globalError ? (
+        <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {globalError}
+        </div>
+      ) : null}
+
+      <FieldGroup className="gap-4">
+        <Field data-invalid={!!errors.name}>
+          <FieldLabel htmlFor="my-form-name">
+            Nom <span className="text-destructive" aria-hidden>*</span>
+          </FieldLabel>
+          <Input
+            id="my-form-name"
+            aria-required="true"
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? "my-form-name-error" : undefined}
+            className={errors.name ? "border-destructive" : undefined}
+            disabled={isSubmitting}
+            {...register("name")}
+          />
+          {errors.name ? (
+            <FieldError id="my-form-name-error">{errors.name.message}</FieldError>
+          ) : null}
+        </Field>
+      </FieldGroup>
+
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "Envoi…" : "Envoyer"}
+      </Button>
+    </form>
+  );
+}
+```
+
+## 4. Mandatory Accessibility Checklist (UX-DR10 / UX-DR14)
+
+Every form field MUST have:
+
+| Attribute | Purpose | Example |
+|---|---|---|
+| `<FieldLabel htmlFor="...">` | Visible label tied to the input | Always present, never hidden |
+| `<span className="text-destructive" aria-hidden>*</span>` | Required indicator | Inside the label for required fields |
+| `aria-required="true"` | Announces required to screen readers | On the `<Input>` |
+| `aria-invalid={!!errors.field}` | Announces invalid state | On the `<Input>`, conditional |
+| `aria-describedby="error-id"` | Links input to its error message | Points to `<FieldError id="...">` when error exists |
+| `<FieldError id="...">` | Error message below the field | Conditionally rendered |
+| `disabled={isSubmitting}` | Prevents double-submit | On the `<Input>` and `<Button>` |
+
+Every `<form>` MUST have:
+
+| Attribute | Purpose |
+|---|---|
+| `noValidate` | Disables browser validation — Zod handles everything |
+| `onSubmit={handleSubmit(onSubmit, onInvalid)}` | Validation + focus on first error |
+
+Every primary/destructive button MUST have:
+
+| Attribute | Purpose |
+|---|---|
+| `min-h-11` (or `className="min-h-11"`) | 44px touch target (UX-DR14) |
+
+## 5. Error Handling
+
+Two error channels — never mix them:
+
+| Error type | Where | How |
+|---|---|---|
+| **Field validation** (Zod) | Below the field | `<FieldError>` with `errors.field.message` |
+| **API / server errors** | Above the form | `globalError` state with `role="alert"` |
+
+```tsx
+// GOOD: Field error below the input
+{errors.email ? (
+  <FieldError id="email-error">{errors.email.message}</FieldError>
+) : null}
+
+// GOOD: Global error above the form
+{globalError ? (
+  <div role="alert" className="...text-destructive">{globalError}</div>
+) : null}
+
+// BAD: Using toast for validation errors
+toast.error(errors.email.message); // Never do this
+```
+
+Use `toast.success()` for success feedback (save confirmed, item created). Never use `toast.error()` for field validation — only for unexpected server errors in non-form contexts.
+
+## 6. When Using `next-safe-action` Instead of `react-hook-form`
+
+For **single-field forms** (e.g. API key creation), `useAction` from `next-safe-action/hooks` is sufficient — `react-hook-form` is overkill.
+
+```tsx
+const action = useAction(createApiKeyAction, {
+  onSuccess: ({ data }) => { /* ... */ },
+  onError: ({ error }) => { toast.error(error.serverError ?? "Erreur"); },
+});
+
+// Validation error from inputSchema
+const nameError = action.result.validationErrors?.name?._errors?.[0];
+```
+
+Still apply the same accessibility attributes:
+
+```tsx
+<Label htmlFor="field-id">
+  Label <span className="text-destructive">*</span>
+</Label>
+<Input
+  id="field-id"
+  aria-required="true"
+  aria-invalid={nameError ? true : undefined}
+  aria-describedby={nameError ? "field-error-id" : undefined}
+/>
+{nameError && (
+  <p id="field-error-id" role="alert" className="mt-1 text-xs text-destructive">
+    {nameError}
+  </p>
+)}
+```
+
+## 7. Anti-Patterns
+
+```tsx
+// BAD: Raw FormData without Zod validation
+async function onSubmit(e: FormEvent) {
+  const fd = new FormData(e.target);
+  await fetch("/api/...", { body: fd });
+}
+
+// BAD: Missing noValidate — browser popups conflict with FieldError
+<form onSubmit={handleSubmit(onSubmit)}>
+
+// BAD: Using useState for individual field errors
+const [emailError, setEmailError] = useState("");
+
+// BAD: Missing onInvalid — no focus management on validation failure
+<form onSubmit={handleSubmit(onSubmit)}>
+
+// BAD: Shared isPending across multiple actions
+const [isPending, startTransition] = useTransition();
+
+// GOOD: Each useAction has its own isExecuting
+const createAction = useAction(createAction, { ... });
+const deleteAction = useAction(deleteAction, { ... });
+```
+
+## 8. FieldDescription for Hints
+
+Use `<FieldDescription>` for input hints (password rules, format expectations). Link it via `aria-describedby` alongside the error:
+
+```tsx
+<Input
+  aria-describedby={
+    errors.password
+      ? "password-error password-hint"
+      : "password-hint"
+  }
+  {...register("password")}
+/>
+<FieldDescription id="password-hint">
+  Au moins 8 caractères, une majuscule, une minuscule et un chiffre.
+</FieldDescription>
+{errors.password ? (
+  <FieldError id="password-error">{errors.password.message}</FieldError>
+) : null}
+```

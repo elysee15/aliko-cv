@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import {
   ArrowLeftIcon,
   SaveIcon,
@@ -17,11 +18,19 @@ import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Badge } from "@workspace/ui/components/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 
 import {
   updateCoverLetterAction,
   deleteCoverLetterAction,
 } from "@/app/actions/cover-letters";
+import { extractActionError } from "@/lib/action-error";
 
 type CoverLetterData = {
   id: string;
@@ -46,14 +55,21 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
   const [resumeId, setResumeId] = useState(letter.resumeId ?? "");
   const [content, setContent] = useState(letter.content);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  const deleteAction = useAction(deleteCoverLetterAction, {
+    onSuccess: () => {
+      toast.success("Lettre supprimée.");
+      router.push("/dashboard/cover-letters");
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
     setSaving(true);
-    const res = await updateCoverLetterAction({
+    const result = await updateCoverLetterAction({
       id: letter.id,
       title,
       company: company || null,
@@ -61,10 +77,12 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
       resumeId: resumeId || null,
       content,
     });
-    if (res.success) {
+    if (result?.data) {
       setLastSaved(new Date());
-    } else {
-      toast.error(res.error);
+    } else if (result?.serverError) {
+      toast.error(result.serverError);
+    } else if (result?.validationErrors) {
+      toast.error("Données invalides.");
     }
     setSaving(false);
   }, [letter.id, title, company, jobTitle, resumeId, content]);
@@ -79,22 +97,13 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
     };
   }, [title, company, jobTitle, resumeId, content, save]);
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!confirm("Supprimer cette lettre de motivation ?")) return;
-    setDeleting(true);
-    const res = await deleteCoverLetterAction(letter.id);
-    if (res.success) {
-      toast.success("Lettre supprimée.");
-      router.push("/dashboard/cover-letters");
-    } else {
-      toast.error(res.error);
-      setDeleting(false);
-    }
+    deleteAction.execute({ id: letter.id });
   }
 
   return (
     <div className="min-h-svh">
-      {/* Toolbar */}
       <div className="flex items-center gap-3 border-b px-4 py-3 print:hidden">
         <Link href="/dashboard/cover-letters">
           <Button variant="ghost" size="icon-sm">
@@ -128,7 +137,7 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
             variant="outline"
             size="sm"
             onClick={handleDelete}
-            disabled={deleting}
+            disabled={deleteAction.isExecuting}
             className="text-destructive hover:text-destructive"
           >
             <TrashIcon />
@@ -137,7 +146,6 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
       </div>
 
       <div className="mx-auto grid max-w-6xl gap-6 p-4 lg:grid-cols-[340px_1fr]">
-        {/* Sidebar - metadata */}
         <div className="space-y-4 print:hidden">
           <Field>
             <FieldLabel>Titre</FieldLabel>
@@ -166,23 +174,30 @@ export function CoverLetterEditor({ letter, resumes, userName }: Props) {
           {resumes.length > 0 && (
             <Field>
               <FieldLabel>CV associé</FieldLabel>
-              <select
-                value={resumeId}
-                onChange={(e) => setResumeId(e.target.value)}
-                className="flex h-8 w-full rounded-md border bg-transparent px-3 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              <Select
+                value={resumeId || "none"}
+                onValueChange={(val) => setResumeId(!val || val === "none" ? "" : val)}
+                items={[
+                  { value: "none", label: "Aucun" },
+                  ...resumes.map((r) => ({ value: r.id, label: r.title })),
+                ]}
               >
-                <option value="">Aucun</option>
-                {resumes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Aucun" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun</SelectItem>
+                  {resumes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           )}
         </div>
 
-        {/* Main content - editor + preview */}
         <div className="space-y-4">
           <div className="print:hidden">
             <Textarea
@@ -198,7 +213,6 @@ Suite à votre annonce pour le poste de…"
             />
           </div>
 
-          {/* Print preview */}
           <div className="hidden print:block">
             <div className="mb-8 space-y-1">
               <p className="font-semibold">{userName}</p>

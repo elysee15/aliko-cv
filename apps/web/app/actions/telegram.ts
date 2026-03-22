@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@aliko-cv/db/client";
@@ -9,49 +8,23 @@ import {
   getTelegramLinkByUser,
   unlinkTelegram,
 } from "@aliko-cv/db/queries";
-import { auth } from "@/lib/auth";
-import type { ActionResult } from "./resume";
 
-async function requireUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) throw new Error("Non autorisé");
-  return session.user;
-}
+import { authClient } from "@/lib/safe-action";
 
-export async function generateTelegramTokenAction(): Promise<
-  ActionResult<{ token: string }>
-> {
-  try {
-    const user = await requireUser();
-    const token = await createTelegramLinkToken(db, user.id);
-    return { success: true, data: { token } };
-  } catch {
-    return { success: false, error: "Impossible de générer le token." };
-  }
-}
+export const generateTelegramTokenAction = authClient.action(
+  async ({ ctx }) => {
+    const token = await createTelegramLinkToken(db, ctx.user.id);
+    return { token };
+  },
+);
 
-export async function getTelegramStatusAction(): Promise<
-  ActionResult<{ linked: boolean; username?: string | null }>
-> {
-  try {
-    const user = await requireUser();
-    const link = await getTelegramLinkByUser(db, user.id);
-    return {
-      success: true,
-      data: { linked: !!link, username: link?.username },
-    };
-  } catch {
-    return { success: false, error: "Erreur" };
-  }
-}
+export const getTelegramStatusAction = authClient.action(async ({ ctx }) => {
+  const link = await getTelegramLinkByUser(db, ctx.user.id);
+  return { linked: !!link, username: link?.username ?? null };
+});
 
-export async function unlinkTelegramAction(): Promise<ActionResult> {
-  try {
-    const user = await requireUser();
-    await unlinkTelegram(db, user.id);
-    revalidatePath("/dashboard/settings/integrations");
-    return { success: true, data: null };
-  } catch {
-    return { success: false, error: "Impossible de délier le compte Telegram." };
-  }
-}
+export const unlinkTelegramAction = authClient.action(async ({ ctx }) => {
+  await unlinkTelegram(db, ctx.user.id);
+  revalidatePath("/dashboard/settings/integrations");
+  return null;
+});

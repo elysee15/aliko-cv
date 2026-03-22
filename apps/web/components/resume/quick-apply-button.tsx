@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { BriefcaseIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ import {
 import type { ApplicationStatus } from "@aliko-cv/db/queries";
 import { APPLICATION_STATUSES } from "@/lib/application-status";
 import { createApplicationAction } from "@/app/actions/applications";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   resumeId: string;
@@ -33,37 +35,9 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
   const [appliedAt, setAppliedAt] = useState(
     () => new Date().toISOString().slice(0, 10),
   );
-  const [loading, setLoading] = useState(false);
 
-  function resetForm() {
-    setCompany("");
-    setJobTitle("");
-    setJobUrl("");
-    setStatus("applied");
-    setAppliedAt(new Date().toISOString().slice(0, 10));
-  }
-
-  async function handleSubmit() {
-    if (!company.trim()) {
-      toast.error("L'entreprise est requise.");
-      return;
-    }
-    if (!jobTitle.trim()) {
-      toast.error("Le poste est requis.");
-      return;
-    }
-
-    setLoading(true);
-    const res = await createApplicationAction({
-      company: company.trim(),
-      jobTitle: jobTitle.trim(),
-      jobUrl: jobUrl.trim() || null,
-      status,
-      appliedAt: appliedAt || null,
-      resumeId,
-    });
-
-    if (res.success) {
+  const { execute, isExecuting } = useAction(createApplicationAction, {
+    onSuccess: () => {
       toast.success("Candidature créée !", {
         description: `${company} — ${jobTitle}`,
         action: {
@@ -75,10 +49,35 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
       });
       setOpen(false);
       resetForm();
-    } else {
-      toast.error(res.error);
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  function resetForm() {
+    setCompany("");
+    setJobTitle("");
+    setJobUrl("");
+    setStatus("applied");
+    setAppliedAt(new Date().toISOString().slice(0, 10));
+  }
+
+  function handleSubmit() {
+    if (!company.trim()) {
+      toast.error("L'entreprise est requise.");
+      return;
     }
-    setLoading(false);
+    if (!jobTitle.trim()) {
+      toast.error("Le poste est requis.");
+      return;
+    }
+    execute({
+      company: company.trim(),
+      jobTitle: jobTitle.trim(),
+      jobUrl: jobUrl.trim() || null,
+      status,
+      appliedAt: appliedAt || null,
+      resumeId,
+    });
   }
 
   return (
@@ -162,10 +161,10 @@ export function QuickApplyButton({ resumeId, resumeTitle }: Props) {
           </Field>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !company.trim() || !jobTitle.trim()}
+            disabled={isExecuting || !company.trim() || !jobTitle.trim()}
             className="w-full"
           >
-            {loading ? (
+            {isExecuting ? (
               <>
                 <Loader2Icon className="animate-spin" />
                 Création…

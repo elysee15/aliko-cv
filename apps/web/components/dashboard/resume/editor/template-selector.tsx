@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import { CheckIcon, LayoutTemplateIcon } from "lucide-react";
 
@@ -18,6 +18,7 @@ import {
   templateDescriptions,
   type TemplateType,
 } from "@/lib/schemas/resume";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   resumeId: string;
@@ -25,18 +26,19 @@ type Props = {
 };
 
 export function TemplateSelector({ resumeId, currentTemplate }: Props) {
-  const [isPending, startTransition] = useTransition();
+  const { execute, isExecuting } = useAction(updateResumeAction, {
+    onSuccess: ({ input }) => {
+      const template = input?.template as TemplateType | undefined;
+      if (template) {
+        toast.success(`Template "${templateLabels[template]}" appliqué.`);
+      }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   function handleSelect(template: TemplateType) {
     if (template === currentTemplate) return;
-    startTransition(async () => {
-      const result = await updateResumeAction(resumeId, { template });
-      if (result.success) {
-        toast.success(`Template "${templateLabels[template]}" appliqué.`);
-      } else {
-        toast.error(result.error);
-      }
-    });
+    execute({ id: resumeId, template });
   }
 
   return (
@@ -49,7 +51,7 @@ export function TemplateSelector({ resumeId, currentTemplate }: Props) {
       </CardHeader>
       <CardContent>
         <div
-          className={`grid gap-3 sm:grid-cols-3 ${isPending ? "pointer-events-none opacity-50" : ""}`}
+          className={`grid gap-3 sm:grid-cols-3 ${isExecuting ? "pointer-events-none opacity-50" : ""}`}
         >
           {templateTypes.map((t) => {
             const isActive = t === currentTemplate;

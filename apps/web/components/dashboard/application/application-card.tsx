@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import {
   BuildingIcon,
   BriefcaseIcon,
@@ -29,6 +29,7 @@ import {
   updateApplicationAction,
   deleteApplicationAction,
 } from "@/app/actions/applications";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   id: string;
@@ -56,30 +57,29 @@ export function ApplicationCard({
   onEdit,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const statusConfig = getStatusConfig(status);
 
+  const updateAction = useAction(updateApplicationAction, {
+    onSuccess: () => router.refresh(),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const deleteAction = useAction(deleteApplicationAction, {
+    onSuccess: () => {
+      toast.success("Candidature supprimée.");
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const isPending = updateAction.isExecuting || deleteAction.isExecuting;
+
   function handleStatusChange(newStatus: ApplicationStatus) {
-    startTransition(async () => {
-      const res = await updateApplicationAction({ id, status: newStatus });
-      if (res.success) {
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    });
+    updateAction.execute({ id, status: newStatus });
   }
 
   function handleDelete() {
-    startTransition(async () => {
-      const res = await deleteApplicationAction(id);
-      if (res.success) {
-        toast.success("Candidature supprimée.");
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    });
+    deleteAction.execute({ id });
   }
 
   return (

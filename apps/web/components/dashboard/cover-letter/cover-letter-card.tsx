@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useAction } from "next-safe-action/hooks";
 import {
   MailIcon,
   TrashIcon,
@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 
 import { deleteCoverLetterAction } from "@/app/actions/cover-letters";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   id: string;
@@ -40,19 +41,14 @@ export function CoverLetterCard({
   updatedAt,
 }: Props) {
   const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
 
-  async function handleDelete() {
-    setDeleting(true);
-    const res = await deleteCoverLetterAction(id);
-    if (res.success) {
+  const { execute, isExecuting } = useAction(deleteCoverLetterAction, {
+    onSuccess: () => {
       toast.success("Lettre supprimée.");
       router.refresh();
-    } else {
-      toast.error(res.error);
-    }
-    setDeleting(false);
-  }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   return (
     <div
@@ -80,10 +76,10 @@ export function CoverLetterCard({
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               className="text-destructive"
-              disabled={deleting}
+              disabled={isExecuting}
               onClick={(e) => {
                 e.stopPropagation();
-                handleDelete();
+                execute({ id });
               }}
             >
               <TrashIcon />

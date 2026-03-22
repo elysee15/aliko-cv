@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 import {
@@ -48,6 +49,7 @@ import {
   sectionTypeLabels,
   type SectionType,
 } from "@/lib/schemas/resume";
+import { extractActionError } from "@/lib/action-error";
 import { SortableSectionEditor } from "./sortable-section-editor";
 
 type Entry = {
@@ -81,7 +83,6 @@ type Props = {
 
 export function SectionList({ resumeId, sections, commentCounts = {} }: Props) {
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
   const [selectedType, setSelectedType] = useState<SectionType>("experience");
   const [sectionTitle, setSectionTitle] = useState("");
   const [optimisticOrder, setOptimisticOrder] = useState<string[] | null>(null);
@@ -90,6 +91,21 @@ export function SectionList({ resumeId, sections, commentCounts = {} }: Props) {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor),
   );
+
+  const createAction = useAction(createSectionAction, {
+    onSuccess: () => {
+      toast.success("Section ajoutée.");
+      setOpen(false);
+      setSectionTitle("");
+      setSelectedType("experience");
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const reorderAction = useAction(reorderSectionsAction, {
+    onSettled: () => setOptimisticOrder(null),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   const sectionIds = optimisticOrder ?? sections.map((s) => s.id);
   const orderedSections = sectionIds
@@ -107,12 +123,7 @@ export function SectionList({ resumeId, sections, commentCounts = {} }: Props) {
     setOptimisticOrder(newOrder);
 
     const items = newOrder.map((id, i) => ({ id, sortOrder: i }));
-
-    startTransition(async () => {
-      const result = await reorderSectionsAction(resumeId, items);
-      setOptimisticOrder(null);
-      if (!result.success) toast.error(result.error);
-    });
+    reorderAction.execute({ resumeId, items });
   }
 
   function handleTypeChange(val: SectionType) {
@@ -122,23 +133,15 @@ export function SectionList({ resumeId, sections, commentCounts = {} }: Props) {
 
   function handleCreate() {
     if (!sectionTitle.trim()) return;
-    startTransition(async () => {
-      const result = await createSectionAction({
-        resumeId,
-        type: selectedType,
-        title: sectionTitle,
-        sortOrder: sections.length,
-      });
-      if (result.success) {
-        toast.success("Section ajoutée.");
-        setOpen(false);
-        setSectionTitle("");
-        setSelectedType("experience");
-      } else {
-        toast.error(result.error);
-      }
+    createAction.execute({
+      resumeId,
+      type: selectedType,
+      title: sectionTitle,
+      sortOrder: sections.length,
     });
   }
+
+  const isPending = createAction.isExecuting || reorderAction.isExecuting;
 
   return (
     <div className="space-y-4">
@@ -180,6 +183,10 @@ export function SectionList({ resumeId, sections, commentCounts = {} }: Props) {
                   onValueChange={(val) =>
                     handleTypeChange(val as SectionType)
                   }
+                  items={sectionTypes.map((t) => ({
+                    value: t,
+                    label: sectionTypeLabels[t],
+                  }))}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />

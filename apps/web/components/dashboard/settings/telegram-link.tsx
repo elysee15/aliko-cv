@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import {
   SendIcon,
@@ -26,55 +27,54 @@ import {
   getTelegramStatusAction,
   unlinkTelegramAction,
 } from "@/app/actions/telegram";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   botUsername?: string;
 };
 
 export function TelegramLink({ botUsername }: Props) {
-  const [isPending, startTransition] = useTransition();
   const [linked, setLinked] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    getTelegramStatusAction().then((res) => {
-      if (res.success) {
-        const data = res.data as { linked: boolean; username?: string | null };
+  const statusAction = useAction(getTelegramStatusAction, {
+    onSuccess: ({ data }) => {
+      if (data) {
         setLinked(data.linked);
         setUsername(data.username ?? null);
       }
-    });
-  }, []);
+    },
+  });
 
-  function handleGenerateToken() {
-    startTransition(async () => {
-      const result = await generateTelegramTokenAction();
-      if (result.success) {
-        const data = result.data as { token: string };
+  const generateAction = useAction(generateTelegramTokenAction, {
+    onSuccess: ({ data }) => {
+      if (data) {
         setToken(data.token);
         toast.success("Token généré ! Valide 10 minutes.");
-      } else {
-        toast.error(result.error);
       }
-    });
-  }
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
-  function handleUnlink() {
-    startTransition(async () => {
-      const result = await unlinkTelegramAction();
-      if (result.success) {
-        setLinked(false);
-        setUsername(null);
-        toast.success("Compte Telegram délié.");
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
+  const unlinkAction = useAction(unlinkTelegramAction, {
+    onSuccess: () => {
+      setLinked(false);
+      setUsername(null);
+      toast.success("Compte Telegram délié.");
+      router.refresh();
+    },
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  useEffect(() => {
+    statusAction.execute();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isPending =
+    generateAction.isExecuting || unlinkAction.isExecuting;
 
   function handleCopy(text: string) {
     navigator.clipboard.writeText(text);
@@ -109,7 +109,7 @@ export function TelegramLink({ botUsername }: Props) {
               variant="outline"
               size="sm"
               disabled={isPending}
-              onClick={handleUnlink}
+              onClick={() => unlinkAction.execute()}
             >
               <UnlinkIcon />
               Délier
@@ -125,7 +125,7 @@ export function TelegramLink({ botUsername }: Props) {
                 <Button
                   size="sm"
                   disabled={isPending}
-                  onClick={handleGenerateToken}
+                  onClick={() => generateAction.execute()}
                 >
                   <LinkIcon />
                   Générer un token
@@ -133,7 +133,6 @@ export function TelegramLink({ botUsername }: Props) {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Step 1: open bot */}
                 <div className="rounded-none border bg-muted/40 p-3 text-sm">
                   <p className="font-medium">Étape 1</p>
                   <p className="mt-1 text-muted-foreground">
@@ -153,7 +152,6 @@ export function TelegramLink({ botUsername }: Props) {
                   </p>
                 </div>
 
-                {/* Step 2: send command */}
                 <div className="rounded-none border bg-muted/40 p-3 text-sm">
                   <p className="font-medium">Étape 2</p>
                   <p className="mt-1 text-muted-foreground">
@@ -184,7 +182,6 @@ export function TelegramLink({ botUsername }: Props) {
           </>
         )}
 
-        {/* Usage guide */}
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer font-medium">
             Commandes disponibles

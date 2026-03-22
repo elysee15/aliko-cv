@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
 
@@ -20,6 +20,7 @@ import { Label } from "@workspace/ui/components/label";
 
 import { createEntryAction } from "@/app/actions/resume";
 import type { SectionType } from "@/lib/schemas/resume";
+import { extractActionError } from "@/lib/action-error";
 
 type Props = {
   sectionId: string;
@@ -51,7 +52,10 @@ export function AddEntryDialog({
   resumeId,
   nextSortOrder,
 }: Props) {
-  const [isPending, startTransition] = useTransition();
+  const { execute, isExecuting } = useAction(createEntryAction, {
+    onSuccess: () => toast.success("Entrée ajoutée."),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -59,20 +63,11 @@ export function AddEntryDialog({
     const title = (fd.get("title") as string).trim();
     if (!title) return;
 
-    startTransition(async () => {
-      const result = await createEntryAction(
-        {
-          sectionId,
-          title,
-          sortOrder: nextSortOrder,
-        },
-        resumeId,
-      );
-      if (result.success) {
-        toast.success("Entrée ajoutée.");
-      } else {
-        toast.error(result.error);
-      }
+    execute({
+      sectionId,
+      title,
+      sortOrder: nextSortOrder,
+      resumeId,
     });
   }
 
@@ -106,8 +101,8 @@ export function AddEntryDialog({
             />
           </Field>
           <DialogFooter className="mt-4">
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Ajout…" : "Ajouter"}
+            <Button type="submit" disabled={isExecuting}>
+              {isExecuting ? "Ajout…" : "Ajouter"}
             </Button>
           </DialogFooter>
         </form>

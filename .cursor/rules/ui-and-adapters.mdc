@@ -25,6 +25,38 @@ import { Button } from '@base-ui/react/button'
 import * as Dialog from '@radix-ui/react-dialog'
 ```
 
+- **Never use native HTML form controls when shadcn/ui equivalents exist.** In particular, never use `<select>` / `<option>` — always use the shadcn `Select` family. The same applies to `<input type="checkbox">` (use `Checkbox`), `<input type="radio">` (use `RadioGroup`), etc.
+
+```tsx
+// BAD — native <select>
+<select value={value} onChange={(e) => setValue(e.target.value)}>
+  <option value="">Choose…</option>
+  <option value="a">A</option>
+</select>
+
+// GOOD — shadcn Select (Base UI)
+// IMPORTANT: pass `items` to Select.Root so the trigger shows the label, not the raw value.
+// Base UI's Select.Value renders the raw value by default; `items` maps value→label.
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@workspace/ui/components/select'
+
+const items = [
+  { value: 'a', label: 'Option A' },
+  { value: 'b', label: 'Option B' },
+]
+
+<Select value={value} onValueChange={setValue} items={items}>
+  <SelectTrigger className="w-full">
+    <SelectValue placeholder="Choose…" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="a">Option A</SelectItem>
+    <SelectItem value="b">Option B</SelectItem>
+  </SelectContent>
+</Select>
+```
+
 - **Use `cn()` for class merging**: Always use `cn()` from `@workspace/ui/lib/utils` — never raw `clsx` or string concatenation.
 - **Use `lucide-react` for icons**: The project standard. Import individual icons directly.
 
@@ -204,6 +236,8 @@ These libraries are fine to import directly (they ARE the standard interface):
 ## 4. Checklist for Code Review
 
 - [ ] UI built with shadcn/ui components, not raw HTML or third-party UI kits
+- [ ] No native `<select>`, `<input type="checkbox">`, or `<input type="radio">` — use shadcn `Select`, `Checkbox`, `RadioGroup`
+- [ ] Every `<Select>` has an `items` prop mapping `value→label` (Base UI renders raw `value` in the trigger otherwise)
 - [ ] Icons from `lucide-react`, not mixed icon libraries
 - [ ] Class merging uses `cn()`, not string concatenation
 - [ ] External utility libs accessed through adapter modules (**except** Better Auth via `@/lib/auth-client`)

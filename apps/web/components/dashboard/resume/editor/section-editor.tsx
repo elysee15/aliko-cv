@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
+import { useState, useCallback } from "react";
+import { useAction } from "next-safe-action/hooks";
 import { toast } from "sonner";
 import {
   ChevronDownIcon,
@@ -43,6 +44,7 @@ import {
 import { sectionTypeLabels, type SectionType } from "@/lib/schemas/resume";
 import { useAutosave } from "@/hooks/use-autosave";
 import { AutosaveIndicator } from "@/components/autosave-indicator";
+import { extractActionError } from "@/lib/action-error";
 import { SortableEntryEditor } from "./sortable-entry-editor";
 import { AddEntryDialog } from "./add-entry-dialog";
 import {
@@ -80,7 +82,6 @@ type Props = {
 
 export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleProps }: Props) {
   const [expanded, setExpanded] = useState(true);
-  const [isPending, startTransition] = useTransition();
   const [optimisticEntryOrder, setOptimisticEntryOrder] = useState<
     string[] | null
   >(null);
@@ -93,9 +94,29 @@ export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleP
     useSensor(KeyboardSensor),
   );
 
+  const deleteAction = useAction(deleteSectionAction, {
+    onSuccess: () => toast.success("Section supprimée."),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const visibilityAction = useAction(updateSectionAction, {
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
+  const reorderAction = useAction(reorderEntriesAction, {
+    onSettled: () => setOptimisticEntryOrder(null),
+    onError: ({ error }) => toast.error(extractActionError(error)),
+  });
+
   const handleTitleSave = useCallback(
     async (data: { title: string }) => {
-      return updateSectionAction(section.id, resumeId, { title: data.title });
+      const result = await updateSectionAction({
+        id: section.id,
+        resumeId,
+        title: data.title,
+      });
+      if (result?.serverError) toast.error(result.serverError);
+      return { success: !!result?.data };
     },
     [section.id, resumeId],
   );
@@ -112,24 +133,18 @@ export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleP
     .map((id) => section.entries.find((e) => e.id === id))
     .filter(Boolean) as Entry[];
 
+  const isPending = deleteAction.isExecuting || visibilityAction.isExecuting;
+
   function handleToggleVisibility() {
-    startTransition(async () => {
-      const result = await updateSectionAction(section.id, resumeId, {
-        visible: !section.visible,
-      });
-      if (!result.success) toast.error(result.error);
+    visibilityAction.execute({
+      id: section.id,
+      resumeId,
+      visible: !section.visible,
     });
   }
 
   function handleDelete() {
-    startTransition(async () => {
-      const result = await deleteSectionAction(section.id, resumeId);
-      if (result.success) {
-        toast.success("Section supprimée.");
-      } else {
-        toast.error(result.error);
-      }
-    });
+    deleteAction.execute({ id: section.id, resumeId });
   }
 
   function handleEntryDragEnd(event: DragEndEvent) {
@@ -143,12 +158,7 @@ export function SectionEditor({ resumeId, section, commentCount = 0, dragHandleP
     setOptimisticEntryOrder(newOrder);
 
     const items = newOrder.map((id, i) => ({ id, sortOrder: i }));
-
-    startTransition(async () => {
-      const result = await reorderEntriesAction(resumeId, items);
-      setOptimisticEntryOrder(null);
-      if (!result.success) toast.error(result.error);
-    });
+    reorderAction.execute({ resumeId, items });
   }
 
   return (

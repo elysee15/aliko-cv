@@ -57,7 +57,9 @@ export function PortfolioSettings({ enabled, slug, headline, bio }: Props) {
   const handleAutoSave = useCallback(
     async (data: typeof autosaveData) => {
       if (!data.slug.trim()) return { success: false };
-      return updatePortfolioAction(data);
+      const result = await updatePortfolioAction(data);
+      if (result?.serverError) toast.error(result.serverError);
+      return { success: !!result?.data };
     },
     [],
   );
